@@ -18,8 +18,8 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { RootStackParamList } from "../navigation";
-import StyledText from "../components/StyledText";
+import { RootStackParamList } from "../../navigation";
+import StyledText from "../../components/StyledText";
 import Svg, { Path } from "react-native-svg";
 
 // Get device dimensions for responsive design

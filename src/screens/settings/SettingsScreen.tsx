@@ -22,17 +22,17 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { RootStackParamList } from "../navigation";
-import { useAppContext } from "../context/AppContext";
+import { RootStackParamList } from "../../navigation";
+import { useAppContext } from "../../context/AppContext";
 import {
   MIN_FONT_SCALE,
   MAX_FONT_SCALE,
   DEFAULT_FONT_SCALE,
-} from "../context/AppContext";
-import StyledText from "../components/StyledText";
-import { SkipDayEntry, SkipDayDate } from "../api/apiClient";
+} from "../../context/AppContext";
+import StyledText from "../../components/StyledText";
+import { SkipDayEntry, SkipDayDate } from "../../api/apiClient";
 import { format, parseISO } from "date-fns";
-import DatePicker from "../components/DatePicker";
+import DatePicker from "../../components/DatePicker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 // import * as Haptics from "expo-haptics";

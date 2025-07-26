@@ -19,11 +19,11 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { RootStackParamList } from "../navigation";
-import { Activity, Category } from "../types";
-import AddActivityModal from "../components/AddActivityModal";
-import StyledText from "../components/StyledText";
-import { useAppContext } from "../context/AppContext";
+import { RootStackParamList } from "../../navigation";
+import { Activity, Category } from "../../types";
+import AddActivityModal from "../../components/AddActivityModal";
+import StyledText from "../../components/StyledText";
+import { useAppContext } from "../../context/AppContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Get device dimensions

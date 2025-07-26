@@ -17,9 +17,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../navigation";
-import Toast, { ToastType } from "../components/Toast";
-import { authService } from "../api";
+import { RootStackParamList } from "../../navigation";
+import Toast, { ToastType } from "../../components/Toast";
+import { authService } from "../../api";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -151,7 +151,7 @@ const ResetPasswordScreen = () => {
 
       if (response.success) {
         setShowSuccess(true);
-        
+
         // Success animation
         Animated.spring(successAnim, {
           toValue: 1,
@@ -161,7 +161,7 @@ const ResetPasswordScreen = () => {
         }).start();
 
         showToast("Password reset successfully!", "success");
-        
+
         // Navigate to login after delay
         setTimeout(() => {
           navigation.reset({
@@ -170,7 +170,10 @@ const ResetPasswordScreen = () => {
           });
         }, 3000);
       } else {
-        showToast(response.error?.message || "Failed to reset password", "error");
+        showToast(
+          response.error?.message || "Failed to reset password",
+          "error"
+        );
       }
     } catch (error: any) {
       console.error("Reset password error:", error);
@@ -197,10 +200,7 @@ const ResetPasswordScreen = () => {
               styles.successContent,
               {
                 opacity: fadeAnim,
-                transform: [
-                  { scale: successAnim },
-                  { translateY: slideAnim },
-                ],
+                transform: [{ scale: successAnim }, { translateY: slideAnim }],
               },
             ]}
           >
@@ -213,11 +213,17 @@ const ResetPasswordScreen = () => {
                   colors={["#44DD44", "#66FF66"]}
                   style={styles.successIconGradient}
                 >
-                  <Icon name="checkmark-outline" size={scale(50)} color="#FFFFFF" />
+                  <Icon
+                    name="checkmark-outline"
+                    size={scale(50)}
+                    color="#FFFFFF"
+                  />
                 </LinearGradient>
               </View>
-              
-              <Text style={styles.successTitle}>Password Reset Successfully!</Text>
+
+              <Text style={styles.successTitle}>
+                Password Reset Successfully!
+              </Text>
               <Text style={styles.successMessage}>
                 Your password has been updated successfully.{"\n"}
                 You can now login with your new password.
@@ -248,7 +254,7 @@ const ResetPasswordScreen = () => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <StatusBar style="light" />
-      
+
       {/* Background with subtle pattern */}
       <View style={styles.background}>
         {[...Array(6)].map((_, index) => (
@@ -292,7 +298,7 @@ const ResetPasswordScreen = () => {
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Icon name="chevron-back" size={scale(24)} color="#44DD44" />
           </TouchableOpacity>
-          
+
           <View style={styles.logoContainer}>
             <LinearGradient
               colors={["#1A1A1A", "#2A2A2A"]}
@@ -326,9 +332,18 @@ const ResetPasswordScreen = () => {
             {/* New Password Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>New Password</Text>
-              <View style={[styles.inputContainer, password ? styles.inputContainerFocused : {}]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  password ? styles.inputContainerFocused : {},
+                ]}
+              >
                 <LinearGradient
-                  colors={password ? ["#44DD44", "#66FF66"] : ["transparent", "transparent"]}
+                  colors={
+                    password
+                      ? ["#44DD44", "#66FF66"]
+                      : ["transparent", "transparent"]
+                  }
                   style={styles.inputBorder}
                 >
                   <View style={styles.inputInner}>
@@ -397,9 +412,18 @@ const ResetPasswordScreen = () => {
             {/* Confirm Password Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Confirm Password</Text>
-              <View style={[styles.inputContainer, confirmPassword ? styles.inputContainerFocused : {}]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  confirmPassword ? styles.inputContainerFocused : {},
+                ]}
+              >
                 <LinearGradient
-                  colors={confirmPassword ? ["#44DD44", "#66FF66"] : ["transparent", "transparent"]}
+                  colors={
+                    confirmPassword
+                      ? ["#44DD44", "#66FF66"]
+                      : ["transparent", "transparent"]
+                  }
                   style={styles.inputBorder}
                 >
                   <View style={styles.inputInner}>
@@ -422,11 +446,17 @@ const ResetPasswordScreen = () => {
                     />
                     <TouchableOpacity
                       style={styles.eyeIcon}
-                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      onPress={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
                       disabled={isLoading}
                     >
                       <Icon
-                        name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                        name={
+                          showConfirmPassword
+                            ? "eye-off-outline"
+                            : "eye-outline"
+                        }
                         size={scale(20)}
                         color={confirmPassword ? "#44DD44" : "#666"}
                       />
@@ -451,7 +481,8 @@ const ResetPasswordScreen = () => {
                     style={[
                       styles.matchText,
                       {
-                        color: password === confirmPassword ? "#44DD44" : "#FF4444",
+                        color:
+                          password === confirmPassword ? "#44DD44" : "#FF4444",
                       },
                     ]}
                   >
@@ -465,14 +496,25 @@ const ResetPasswordScreen = () => {
 
             {/* Password Requirements */}
             <View style={styles.requirementsContainer}>
-              <Text style={styles.requirementsTitle}>Password Requirements:</Text>
+              <Text style={styles.requirementsTitle}>
+                Password Requirements:
+              </Text>
               <View style={styles.requirementsList}>
                 {[
                   { text: "At least 8 characters", test: password.length >= 8 },
-                  { text: "One uppercase letter", test: /[A-Z]/.test(password) },
-                  { text: "One lowercase letter", test: /[a-z]/.test(password) },
+                  {
+                    text: "One uppercase letter",
+                    test: /[A-Z]/.test(password),
+                  },
+                  {
+                    text: "One lowercase letter",
+                    test: /[a-z]/.test(password),
+                  },
                   { text: "One number", test: /\d/.test(password) },
-                  { text: "One special character", test: /[^A-Za-z0-9]/.test(password) },
+                  {
+                    text: "One special character",
+                    test: /[^A-Za-z0-9]/.test(password),
+                  },
                 ].map((req, index) => (
                   <View key={index} style={styles.requirementItem}>
                     <Icon
@@ -495,7 +537,10 @@ const ResetPasswordScreen = () => {
 
             {/* Reset Button */}
             <TouchableOpacity
-              style={[styles.resetButton, isLoading && styles.resetButtonDisabled]}
+              style={[
+                styles.resetButton,
+                isLoading && styles.resetButtonDisabled,
+              ]}
               onPress={handleResetPassword}
               disabled={isLoading || !password || !confirmPassword}
               activeOpacity={0.8}

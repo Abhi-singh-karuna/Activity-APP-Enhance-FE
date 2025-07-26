@@ -17,9 +17,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../navigation";
-import Toast, { ToastType } from "../components/Toast";
-import { authService } from "../api";
+import { RootStackParamList } from "../../navigation";
+import Toast, { ToastType } from "../../components/Toast";
+import { authService } from "../../api";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -106,16 +106,17 @@ const ForgotPasswordScreen = () => {
       if (response.success) {
         setEmailSent(true);
         showToast("OTP sent to your email successfully!", "success");
-        
+
         // Navigate to OTP verification screen after a short delay
         setTimeout(() => {
-          navigation.navigate("OtpVerification", { 
-            email: email.trim() 
+          navigation.navigate("OtpVerification", {
+            email: email.trim(),
           });
         }, 2000); // 2 second delay to show success message
-        
       } else {
-        const errorMessage = response.error?.message || "Failed to send reset email. Please try again.";
+        const errorMessage =
+          response.error?.message ||
+          "Failed to send reset email. Please try again.";
         showToast(errorMessage, "error");
       }
     } catch (error: any) {
@@ -138,8 +139,8 @@ const ForgotPasswordScreen = () => {
 
   // Navigate to OTP screen manually
   const handleGoToOtp = () => {
-    navigation.navigate("OtpVerification", { 
-      email: email.trim() 
+    navigation.navigate("OtpVerification", {
+      email: email.trim(),
     });
   };
 
@@ -147,7 +148,7 @@ const ForgotPasswordScreen = () => {
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
-        
+
         <View style={styles.background}>
           {[...Array(6)].map((_, index) => (
             <Animated.View
@@ -178,10 +179,7 @@ const ForgotPasswordScreen = () => {
               styles.successContent,
               {
                 opacity: fadeAnim,
-                transform: [
-                  { scale: successAnim },
-                  { translateY: slideAnim },
-                ],
+                transform: [{ scale: successAnim }, { translateY: slideAnim }],
               },
             ]}
           >
@@ -197,15 +195,16 @@ const ForgotPasswordScreen = () => {
                   <Icon name="mail-outline" size={scale(50)} color="#FFFFFF" />
                 </LinearGradient>
               </View>
-              
+
               <Text style={styles.successTitle}>OTP Sent!</Text>
               <Text style={styles.successMessage}>
                 We've sent a 6-digit verification code to:
               </Text>
               <Text style={styles.emailText}>{email}</Text>
-              
+
               <Text style={styles.instructionText}>
-                Please check your email and enter the OTP to verify your identity.
+                Please check your email and enter the OTP to verify your
+                identity.
               </Text>
 
               {/* Go to OTP Button */}
@@ -242,7 +241,7 @@ const ForgotPasswordScreen = () => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <StatusBar style="light" />
-      
+
       {/* Background with subtle pattern */}
       <View style={styles.background}>
         {[...Array(6)].map((_, index) => (
@@ -283,24 +282,25 @@ const ForgotPasswordScreen = () => {
             },
           ]}
         >
-          <TouchableOpacity style={styles.backIconButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backIconButton}
+            onPress={() => navigation.goBack()}
+          >
             <Icon name="chevron-back" size={scale(24)} color="#FF6B6B" />
           </TouchableOpacity>
-          
+
           <View style={styles.logoContainer}>
             <LinearGradient
               colors={["#1A1A1A", "#2A2A2A"]}
               style={styles.logoBackground}
             >
-              <Icon
-                name="key-outline"
-                size={scale(40)}
-                color="#FF6B6B"
-              />
+              <Icon name="key-outline" size={scale(40)} color="#FF6B6B" />
             </LinearGradient>
           </View>
           <Text style={styles.appName}>Forgot Password</Text>
-          <Text style={styles.appTagline}>Don't worry, we'll help you reset it</Text>
+          <Text style={styles.appTagline}>
+            Don't worry, we'll help you reset it
+          </Text>
         </Animated.View>
 
         {/* Main form container */}
@@ -320,16 +320,26 @@ const ForgotPasswordScreen = () => {
             <View style={styles.instructionContainer}>
               <Text style={styles.instructionTitle}>Reset Your Password</Text>
               <Text style={styles.instructionText}>
-                Enter your email address and we'll send you a 6-digit OTP to verify your identity.
+                Enter your email address and we'll send you a 6-digit OTP to
+                verify your identity.
               </Text>
             </View>
 
             {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Email Address</Text>
-              <View style={[styles.inputContainer, email ? styles.inputContainerFocused : {}]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  email ? styles.inputContainerFocused : {},
+                ]}
+              >
                 <LinearGradient
-                  colors={email ? ["#FF6B6B", "#FF8E53"] : ["transparent", "transparent"]}
+                  colors={
+                    email
+                      ? ["#FF6B6B", "#FF8E53"]
+                      : ["transparent", "transparent"]
+                  }
                   style={styles.inputBorder}
                 >
                   <View style={styles.inputInner}>
@@ -359,7 +369,10 @@ const ForgotPasswordScreen = () => {
 
             {/* Send OTP Button */}
             <TouchableOpacity
-              style={[styles.resetButton, isLoading && styles.resetButtonDisabled]}
+              style={[
+                styles.resetButton,
+                isLoading && styles.resetButtonDisabled,
+              ]}
               onPress={handleForgotPassword}
               disabled={isLoading}
               activeOpacity={0.8}
@@ -384,7 +397,10 @@ const ForgotPasswordScreen = () => {
             {/* Back to Login Link */}
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>Remember your password? </Text>
-              <TouchableOpacity onPress={handleBackToLogin} disabled={isLoading}>
+              <TouchableOpacity
+                onPress={handleBackToLogin}
+                disabled={isLoading}
+              >
                 <Text style={styles.loginLink}>Back to Login</Text>
               </TouchableOpacity>
             </View>

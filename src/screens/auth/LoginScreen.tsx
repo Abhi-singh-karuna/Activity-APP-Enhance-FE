@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
   ActivityIndicator,
   Dimensions,
   Animated,
@@ -17,10 +18,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../navigation";
-import StyledText from "../components/StyledText";
-import Toast, { ToastType } from "../components/Toast";
-import { authService, RegisterRequest } from "../api";
+import { RootStackParamList } from "../../navigation";
+import StyledText from "../../components/StyledText";
+import { useAppContext } from "../../context/AppContext";
+import Toast, { ToastType } from "../../components/Toast";
+import { authService, LoginRequest } from "../../api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -34,16 +37,13 @@ const scale = (size: number) => {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const SignUpScreen = () => {
+const LoginScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const { fontSizeMultiplier, login: contextLogin } = useAppContext();
 
   // Toast state
   const [toastVisible, setToastVisible] = useState(false);
@@ -76,13 +76,15 @@ const SignUpScreen = () => {
     setToastVisible(true);
   };
 
-  const handleSignUp = async () => {
-    // Input validation
-    if (!name.trim()) {
-      showToast("Name is required", "error");
-      return;
-    }
+  // Navigate to Activity screen with delay
+  const navigateToActivity = (delay: number = 1000) => {
+    setTimeout(() => {
+      navigation.navigate("Activity");
+    }, delay);
+  };
 
+  const handleLogin = async () => {
+    // Input validation
     if (!email.trim()) {
       showToast("Email is required", "error");
       return;
@@ -93,11 +95,6 @@ const SignUpScreen = () => {
       return;
     }
 
-    if (!confirmPassword.trim()) {
-      showToast("Please confirm your password", "error");
-      return;
-    }
-
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
@@ -105,55 +102,50 @@ const SignUpScreen = () => {
       return;
     }
 
-    // Password validation
-    if (password.length < 6) {
-      showToast("Password must be at least 6 characters long", "error");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      showToast("Passwords do not match", "error");
-      return;
-    }
-
-    if (!acceptedTerms) {
-      showToast("Please accept the terms and conditions", "error");
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const registerRequest: RegisterRequest = {
-        name: name.trim(),
+      // Create login request
+      const loginRequest: LoginRequest = {
         email: email.trim(),
         password: password.trim(),
       };
 
-      const response = await authService.register(registerRequest);
+      // Call the API
+      const response = await authService.login(loginRequest);
 
-      if (response.success) {
-        showToast(
-          "Account created successfully! Please check your email to verify your account.",
-          "success"
-        );
+      if (response.success && response.data) {
+        // Successful login
+        showToast("Login successful! Welcome back.", "success");
 
-        setTimeout(() => {
-          navigation.navigate("Login");
-        }, 2000);
+        try {
+          // Update app context with user data
+          await contextLogin();
+
+          // Set login status
+          await AsyncStorage.setItem("isLoggedIn", "true");
+        } catch (contextError) {
+          console.warn("Context login failed, but continuing:", contextError);
+        }
+
+        // Navigate to Activity on success
+        navigateToActivity();
       } else {
+        // Login failed
         const errorMessage =
-          response.error?.message || "Registration failed. Please try again.";
+          response.error?.message || "Login failed. Please try again.";
         showToast(errorMessage, "error");
       }
     } catch (error: any) {
-      console.error("Registration error:", error);
+      // Handle any unexpected errors
+      console.error("Login error:", error);
       let errorMessage = "An unexpected error occurred. Please try again.";
 
       if (error.code === "NETWORK_ERROR") {
         errorMessage = "Network error. Please check your internet connection.";
-      } else if (error.code === "EMAIL_EXISTS") {
-        errorMessage = "An account with this email already exists.";
+      } else if (error.code === "UNAUTHORIZED") {
+        errorMessage =
+          "Invalid credentials. Please check your email and password.";
       }
 
       showToast(errorMessage, "error");
@@ -162,8 +154,12 @@ const SignUpScreen = () => {
     }
   };
 
-  const handleLogin = () => {
-    navigation.navigate("Login");
+  const handleForgotPassword = () => {
+    navigation.navigate("ForgotPassword");
+  };
+
+  const handleSignUp = () => {
+    navigation.navigate("SignupScreen");
   };
 
   return (
@@ -175,6 +171,7 @@ const SignUpScreen = () => {
 
       {/* Background with subtle pattern */}
       <View style={styles.background}>
+        {/* Animated background elements */}
         {[...Array(6)].map((_, index) => (
           <Animated.View
             key={`bg-element-${index}`}
@@ -191,7 +188,7 @@ const SignUpScreen = () => {
             ]}
           >
             <LinearGradient
-              colors={["#9C6CDA", "#00E5FF"]}
+              colors={["#00E5FF", "#9C6CDA"]}
               style={styles.backgroundElementGradient}
             />
           </Animated.View>
@@ -203,7 +200,7 @@ const SignUpScreen = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header with logo */}
         <Animated.View
           style={[
             styles.headerContainer,
@@ -213,24 +210,17 @@ const SignUpScreen = () => {
             },
           ]}
         >
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Icon name="chevron-back" size={scale(24)} color="#00E5FF" />
-          </TouchableOpacity>
-
           <View style={styles.logoContainer}>
             <LinearGradient
               colors={["#1A1A1A", "#2A2A2A"]}
               style={styles.logoBackground}
             >
-              <Icon name="book-outline" size={scale(40)} color="#9C6CDA" />
+              <Icon name="time-outline" size={scale(40)} color="#00E5FF" />
             </LinearGradient>
           </View>
-          <Text style={styles.appName}>Create Account</Text>
+          <Text style={styles.appName}>Learning Tracker</Text>
           <Text style={styles.appTagline}>
-            Join us to start your learning journey
+            Master your time, enhance your knowledge
           </Text>
         </Animated.View>
 
@@ -248,43 +238,11 @@ const SignUpScreen = () => {
             colors={["#0A0A0A", "#1A1A1A"]}
             style={styles.formGradient}
           >
-            {/* Name Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Full Name</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  name ? styles.inputContainerFocused : {},
-                ]}
-              >
-                <LinearGradient
-                  colors={
-                    name
-                      ? ["#9C6CDA", "#00E5FF"]
-                      : ["transparent", "transparent"]
-                  }
-                  style={styles.inputBorder}
-                >
-                  <View style={styles.inputInner}>
-                    <Icon
-                      name="person-outline"
-                      size={scale(20)}
-                      color={name ? "#9C6CDA" : "#666"}
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter your full name"
-                      placeholderTextColor="#666"
-                      autoCapitalize="words"
-                      value={name}
-                      onChangeText={setName}
-                      editable={!isLoading}
-                      returnKeyType="next"
-                    />
-                  </View>
-                </LinearGradient>
-              </View>
+            <View style={styles.formHeader}>
+              <Text style={styles.welcomeText}>Welcome Back</Text>
+              <Text style={styles.loginText}>
+                Sign in to continue your learning journey
+              </Text>
             </View>
 
             {/* Email Input */}
@@ -299,7 +257,7 @@ const SignUpScreen = () => {
                 <LinearGradient
                   colors={
                     email
-                      ? ["#9C6CDA", "#00E5FF"]
+                      ? ["#00E5FF", "#9C6CDA"]
                       : ["transparent", "transparent"]
                   }
                   style={styles.inputBorder}
@@ -308,11 +266,14 @@ const SignUpScreen = () => {
                     <Icon
                       name="mail-outline"
                       size={scale(20)}
-                      color={email ? "#9C6CDA" : "#666"}
+                      color={email ? "#00E5FF" : "#666"}
                       style={styles.inputIcon}
                     />
                     <TextInput
-                      style={styles.input}
+                      style={[
+                        styles.input,
+                        { fontSize: scale(16) * fontSizeMultiplier },
+                      ]}
                       placeholder="Enter your email"
                       placeholderTextColor="#666"
                       keyboardType="email-address"
@@ -340,7 +301,7 @@ const SignUpScreen = () => {
                 <LinearGradient
                   colors={
                     password
-                      ? ["#9C6CDA", "#00E5FF"]
+                      ? ["#00E5FF", "#9C6CDA"]
                       : ["transparent", "transparent"]
                   }
                   style={styles.inputBorder}
@@ -349,18 +310,22 @@ const SignUpScreen = () => {
                     <Icon
                       name="lock-closed-outline"
                       size={scale(20)}
-                      color={password ? "#9C6CDA" : "#666"}
+                      color={password ? "#00E5FF" : "#666"}
                       style={styles.inputIcon}
                     />
                     <TextInput
-                      style={styles.input}
-                      placeholder="Create password (min 6 characters)"
+                      style={[
+                        styles.input,
+                        { fontSize: scale(16) * fontSizeMultiplier },
+                      ]}
+                      placeholder="Enter your password"
                       placeholderTextColor="#666"
                       secureTextEntry={!showPassword}
                       value={password}
                       onChangeText={setPassword}
                       editable={!isLoading}
-                      returnKeyType="next"
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
                     />
                     <TouchableOpacity
                       style={styles.eyeIcon}
@@ -370,7 +335,7 @@ const SignUpScreen = () => {
                       <Icon
                         name={showPassword ? "eye-off-outline" : "eye-outline"}
                         size={scale(20)}
-                        color={password ? "#9C6CDA" : "#666"}
+                        color={password ? "#00E5FF" : "#666"}
                       />
                     </TouchableOpacity>
                   </View>
@@ -378,122 +343,66 @@ const SignUpScreen = () => {
               </View>
             </View>
 
-            {/* Confirm Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Confirm Password</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  confirmPassword ? styles.inputContainerFocused : {},
-                ]}
-              >
-                <LinearGradient
-                  colors={
-                    confirmPassword
-                      ? ["#9C6CDA", "#00E5FF"]
-                      : ["transparent", "transparent"]
-                  }
-                  style={styles.inputBorder}
-                >
-                  <View style={styles.inputInner}>
-                    <Icon
-                      name="shield-checkmark-outline"
-                      size={scale(20)}
-                      color={confirmPassword ? "#9C6CDA" : "#666"}
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Confirm your password"
-                      placeholderTextColor="#666"
-                      secureTextEntry={!showConfirmPassword}
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      editable={!isLoading}
-                      returnKeyType="done"
-                      onSubmitEditing={handleSignUp}
-                    />
-                    <TouchableOpacity
-                      style={styles.eyeIcon}
-                      onPress={() =>
-                        setShowConfirmPassword(!showConfirmPassword)
-                      }
-                      disabled={isLoading}
-                    >
-                      <Icon
-                        name={
-                          showConfirmPassword
-                            ? "eye-off-outline"
-                            : "eye-outline"
-                        }
-                        size={scale(20)}
-                        color={confirmPassword ? "#9C6CDA" : "#666"}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </LinearGradient>
-              </View>
-            </View>
-
-            {/* Terms and Conditions */}
+            {/* Forgot Password Link */}
             <TouchableOpacity
-              style={styles.termsContainer}
-              onPress={() => setAcceptedTerms(!acceptedTerms)}
+              style={styles.forgotPasswordContainer}
+              onPress={handleForgotPassword}
               disabled={isLoading}
             >
-              <View style={styles.checkbox}>
-                <LinearGradient
-                  colors={
-                    acceptedTerms
-                      ? ["#9C6CDA", "#00E5FF"]
-                      : ["transparent", "transparent"]
-                  }
-                  style={styles.checkboxGradient}
-                >
-                  {acceptedTerms && (
-                    <Icon name="checkmark" size={scale(16)} color="#FFFFFF" />
-                  )}
-                </LinearGradient>
-              </View>
-              <Text style={styles.termsText}>
-                I agree to the{" "}
-                <Text style={styles.termsLink}>Terms & Conditions</Text> and{" "}
-                <Text style={styles.termsLink}>Privacy Policy</Text>
-              </Text>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
 
-            {/* Sign Up Button */}
+            {/* Login Button */}
             <TouchableOpacity
               style={[
-                styles.signUpButton,
-                isLoading && styles.signUpButtonDisabled,
+                styles.loginButton,
+                isLoading && styles.loginButtonDisabled,
               ]}
-              onPress={handleSignUp}
+              onPress={handleLogin}
               disabled={isLoading}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={isLoading ? ["#333", "#444"] : ["#9C6CDA", "#00E5FF"]}
+                colors={isLoading ? ["#333", "#444"] : ["#00E5FF", "#9C6CDA"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.signUpButtonGradient}
+                style={styles.loginButtonGradient}
               >
                 {isLoading ? (
                   <View style={styles.loadingContainer}>
                     <ActivityIndicator color="#FFFFFF" size="small" />
-                    <Text style={styles.loadingText}>Creating Account...</Text>
+                    <Text style={styles.loadingText}>Signing in...</Text>
                   </View>
                 ) : (
-                  <Text style={styles.signUpButtonText}>Create Account</Text>
+                  <Text style={styles.loginButtonText}>Sign In</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Login Link */}
-            <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>Already have an account? </Text>
-              <TouchableOpacity onPress={handleLogin} disabled={isLoading}>
-                <Text style={styles.loginLink}>Sign In</Text>
+            {/* Demo Credentials */}
+            <View style={styles.demoContainer}>
+              <LinearGradient
+                colors={["rgba(0, 229, 255, 0.1)", "rgba(156, 108, 218, 0.1)"]}
+                style={styles.demoGradient}
+              >
+                <Icon
+                  name="information-circle-outline"
+                  size={scale(16)}
+                  color="#00E5FF"
+                />
+                <View style={styles.demoContent}>
+                  <Text style={styles.demoTitle}>Demo Credentials</Text>
+                  <Text style={styles.demoText}>Email: user@example.com</Text>
+                  <Text style={styles.demoText}>Password: password123</Text>
+                </View>
+              </LinearGradient>
+            </View>
+
+            {/* Sign Up Link */}
+            <View style={styles.signUpContainer}>
+              <Text style={styles.signUpText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={handleSignUp} disabled={isLoading}>
+                <Text style={styles.signUpLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>
           </LinearGradient>
@@ -542,19 +451,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     alignItems: "center",
-    marginBottom: scale(40),
-    position: "relative",
-  },
-  backButton: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    width: scale(44),
-    height: scale(44),
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: scale(22),
-    backgroundColor: "rgba(0, 229, 255, 0.1)",
+    marginBottom: scale(50),
   },
   logoContainer: {
     marginBottom: scale(20),
@@ -569,7 +466,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
   appName: {
-    fontSize: scale(28),
+    fontSize: scale(32),
     fontWeight: "900",
     color: "#FFFFFF",
     marginBottom: scale(8),
@@ -594,6 +491,23 @@ const styles = StyleSheet.create({
     padding: scale(30),
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  formHeader: {
+    marginBottom: scale(30),
+    alignItems: "center",
+  },
+  welcomeText: {
+    fontSize: scale(28),
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: scale(8),
+    letterSpacing: 0.5,
+  },
+  loginText: {
+    fontSize: scale(14),
+    color: "#9C9C9C",
+    textAlign: "center",
+    fontWeight: "500",
   },
   inputGroup: {
     marginBottom: scale(20),
@@ -632,64 +546,41 @@ const styles = StyleSheet.create({
     height: "100%",
     color: "#FFFFFF",
     fontWeight: "500",
-    fontSize: scale(16),
   },
   eyeIcon: {
     padding: scale(8),
   },
-  termsContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+  forgotPasswordContainer: {
+    alignItems: "flex-end",
     marginBottom: scale(30),
   },
-  checkbox: {
-    width: scale(20),
-    height: scale(20),
-    borderRadius: scale(4),
-    borderWidth: 2,
-    borderColor: "#666",
-    marginRight: scale(12),
-    marginTop: scale(2),
-    overflow: "hidden",
-  },
-  checkboxGradient: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: scale(2),
-  },
-  termsText: {
-    flex: 1,
-    color: "#B0B0B0",
+  forgotPasswordText: {
+    color: "#00E5FF",
     fontSize: scale(14),
-    lineHeight: scale(20),
-  },
-  termsLink: {
-    color: "#9C6CDA",
     fontWeight: "600",
   },
-  signUpButton: {
+  loginButton: {
     height: scale(56),
     borderRadius: scale(12),
     overflow: "hidden",
     marginBottom: scale(25),
     elevation: 5,
-    shadowColor: "#9C6CDA",
+    shadowColor: "#00E5FF",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
-  signUpButtonDisabled: {
+  loginButtonDisabled: {
     opacity: 0.7,
     elevation: 0,
     shadowOpacity: 0,
   },
-  signUpButtonGradient: {
+  loginButtonGradient: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  signUpButtonText: {
+  loginButtonText: {
     color: "#FFFFFF",
     fontWeight: "800",
     fontSize: scale(16),
@@ -705,21 +596,49 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     marginLeft: scale(12),
   },
-  loginContainer: {
+  demoContainer: {
+    marginBottom: scale(25),
+    borderRadius: scale(12),
+    overflow: "hidden",
+  },
+  demoGradient: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: scale(16),
+    borderWidth: 1,
+    borderColor: "rgba(0, 229, 255, 0.2)",
+  },
+  demoContent: {
+    flex: 1,
+    marginLeft: scale(12),
+  },
+  demoTitle: {
+    color: "#00E5FF",
+    fontWeight: "700",
+    fontSize: scale(14),
+    marginBottom: scale(4),
+  },
+  demoText: {
+    color: "#B0B0B0",
+    fontSize: scale(12),
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    lineHeight: scale(16),
+  },
+  signUpContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
-  loginText: {
+  signUpText: {
     color: "#9C9C9C",
     fontSize: scale(14),
     fontWeight: "500",
   },
-  loginLink: {
-    color: "#00E5FF",
+  signUpLink: {
+    color: "#9C6CDA",
     fontSize: scale(14),
     fontWeight: "700",
   },
 });
 
-export default SignUpScreen;
+export default LoginScreen;

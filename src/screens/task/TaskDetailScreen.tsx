@@ -13,10 +13,10 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { RootStackParamList } from "../navigation";
-import { Task, Category } from "../types";
-import StyledText from "../components/StyledText";
-import { useAppContext } from "../context/AppContext";
+import { RootStackParamList } from "../../navigation";
+import { Task, Category } from "../../types";
+import StyledText from "../../components/StyledText";
+import { useAppContext } from "../../context/AppContext";
 
 type TaskDetailRouteProp = RouteProp<RootStackParamList, "TaskDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;

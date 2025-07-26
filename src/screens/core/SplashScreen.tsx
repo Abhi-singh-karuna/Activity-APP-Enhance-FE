@@ -11,12 +11,18 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../navigation";
+import { RootStackParamList } from "../../navigation";
 import Icon from "react-native-vector-icons/Ionicons";
-import StyledText from "../components/StyledText";
-import { appService } from "../api";
+import StyledText from "../../components/StyledText";
+import { appService } from "../../api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Svg, { Circle, Path, Defs, LinearGradient as SvgLinearGradient, Stop } from "react-native-svg";
+import Svg, {
+  Circle,
+  Path,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+} from "react-native-svg";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -90,7 +96,7 @@ const SplashScreen = () => {
           useNativeDriver: true,
         }),
       ]),
-      
+
       // Text animations
       Animated.parallel([
         Animated.timing(titleOpacity, {
@@ -107,7 +113,7 @@ const SplashScreen = () => {
           useNativeDriver: true,
         }),
       ]),
-      
+
       // Pen signing animation (horizontal line)
       Animated.parallel([
         Animated.timing(penLineAnimation, {
@@ -126,7 +132,7 @@ const SplashScreen = () => {
     ]).start();
 
     // Continuous animations
-    
+
     // Clock rotation
     Animated.loop(
       Animated.timing(clockRotation, {
@@ -208,23 +214,17 @@ const SplashScreen = () => {
     <View style={styles.container}>
       {/* Pure black background */}
       <View style={styles.background}>
-        
         <View style={styles.content}>
           {/* Dual logo section */}
           <View style={styles.logoSection}>
-            
             {/* Dual icons container */}
             <View style={styles.iconsContainer}>
-              
               {/* Clock icon with rotation animation */}
               <Animated.View
                 style={[
                   styles.clockContainer,
                   {
-                    transform: [
-                      { scale: clockScale },
-                      { rotate: clockSpin },
-                    ],
+                    transform: [{ scale: clockScale }, { rotate: clockSpin }],
                   },
                 ]}
               >
@@ -232,11 +232,7 @@ const SplashScreen = () => {
                   colors={["#1A1A1A", "#2A2A2A"]}
                   style={styles.iconBackground}
                 >
-                  <Icon
-                    name="time-outline"
-                    size={scale(40)}
-                    color="#00E5FF"
-                  />
+                  <Icon name="time-outline" size={scale(40)} color="#00E5FF" />
                 </LinearGradient>
               </Animated.View>
 
@@ -245,10 +241,7 @@ const SplashScreen = () => {
                 style={[
                   styles.bookContainer,
                   {
-                    transform: [
-                      { scale: bookScale },
-                      { rotateY: bookRotateY },
-                    ],
+                    transform: [{ scale: bookScale }, { rotateY: bookRotateY }],
                   },
                 ]}
               >
@@ -256,11 +249,7 @@ const SplashScreen = () => {
                   colors={["#1A1A1A", "#2A2A2A"]}
                   style={styles.iconBackground}
                 >
-                  <Icon
-                    name="book-outline"
-                    size={scale(40)}
-                    color="#9C6CDA"
-                  />
+                  <Icon name="book-outline" size={scale(40)} color="#9C6CDA" />
                 </LinearGradient>
               </Animated.View>
             </View>
@@ -324,7 +313,7 @@ const SplashScreen = () => {
                 style={styles.penLineGradient}
               />
             </Animated.View>
-            
+
             {/* Animated pen icon moving horizontally */}
             <Animated.View
               style={[
@@ -337,11 +326,7 @@ const SplashScreen = () => {
                 },
               ]}
             >
-              <Icon
-                name="create-outline"
-                size={scale(20)}
-                color="#FFFFFF"
-              />
+              <Icon name="create-outline" size={scale(20)} color="#FFFFFF" />
             </Animated.View>
           </View>
 
@@ -380,7 +365,11 @@ const SplashScreen = () => {
                 colors={["rgba(244, 67, 54, 0.15)", "rgba(244, 67, 54, 0.05)"]}
                 style={styles.errorGradient}
               >
-                <Icon name="alert-circle-outline" size={scale(20)} color="#FF6B6B" />
+                <Icon
+                  name="alert-circle-outline"
+                  size={scale(20)}
+                  color="#FF6B6B"
+                />
                 <StyledText variant="body" style={styles.errorText}>
                   {initError}
                 </StyledText>

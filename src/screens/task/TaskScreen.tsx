@@ -15,11 +15,11 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { RootStackParamList } from "../navigation";
-import { Task, Category } from "../types";
-import AddTaskModal from "../components/AddTaskModal";
-import StyledText from "../components/StyledText";
-import { useAppContext } from "../context/AppContext";
+import { RootStackParamList } from "../../navigation";
+import { Task, Category } from "../../types";
+import AddTaskModal from "../../components/AddTaskModal";
+import StyledText from "../../components/StyledText";
+import { useAppContext } from "../../context/AppContext";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 

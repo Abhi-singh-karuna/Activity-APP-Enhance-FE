@@ -14,12 +14,12 @@ import {
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
-import { RootStackParamList } from "../navigation";
-import { CompletionRate, Activity, Task } from "../types";
+import { RootStackParamList } from "../../navigation";
+import { CompletionRate, Activity, Task } from "../../types";
 import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
-import StyledText from "../components/StyledText";
+import StyledText from "../../components/StyledText";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useAppContext } from "../context/AppContext";
+import { useAppContext } from "../../context/AppContext";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type StatsRouteProp = RouteProp<RootStackParamList, "Stats">;

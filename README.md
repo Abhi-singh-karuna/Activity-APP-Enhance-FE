@@ -61,15 +61,87 @@ MOCK_SERVER: {
 
 ```
 src/
-├── api/                 # API services and client
-├── components/          # Reusable components
-├── config/             # App configuration
-├── context/            # React context providers
-├── navigation/         # Navigation setup
-├── screens/            # Screen components
+├── api/                    # API services and client
+│   ├── services/          # Feature-specific API services
+│   ├── apiClient.ts       # HTTP client configuration
+│   └── index.ts           # API exports
+├── components/            # Reusable UI components
+│   ├── AddActivityModal.tsx
+│   ├── AddTaskModal.tsx
+│   ├── DatePicker.tsx
+│   ├── SkipDayList.tsx
+│   ├── StyledText.tsx
+│   └── Toast.tsx
+├── config/               # App configuration
+│   └── api.ts           # API endpoints and settings
+├── context/             # React context providers
+│   └── AppContext.tsx   # Global state management
+├── navigation/          # Navigation setup
+│   └── index.tsx        # Stack navigator configuration
+├── screens/             # Screen components (organized by feature)
+│   ├── auth/           # Authentication screens
+│   │   ├── LoginScreen.tsx
+│   │   ├── SignupScreen.tsx
+│   │   ├── ForgotPasswordScreen.tsx
+│   │   ├── OTPVerificationScreen.tsx
+│   │   ├── ResetPasswordScreen.tsx
+│   │   └── index.ts
+│   ├── core/           # Core application screens
+│   │   ├── SplashScreen.tsx
+│   │   └── index.ts
+│   ├── activity/       # Activity management screens
+│   │   ├── ActivityScreen.tsx
+│   │   ├── ActivityDetailScreen.tsx
+│   │   └── index.ts
+│   ├── task/           # Task management screens
+│   │   ├── TaskScreen.tsx
+│   │   ├── TaskDetailScreen.tsx
+│   │   └── index.ts
+│   ├── analytics/      # Analytics and statistics screens
+│   │   ├── StatsScreen.tsx
+│   │   └── index.ts
+│   ├── settings/       # Settings and configuration screens
+│   │   ├── SettingsScreen.tsx
+│   │   └── index.ts
+│   └── index.ts        # Main screens export
 ├── types/              # TypeScript type definitions
+│   └── index.ts
 └── ReactotronConfig.ts # Development debugging
 ```
+
+## Screen Organization
+
+The screens are organized into logical groups for better maintainability:
+
+### 🔐 Authentication (`src/screens/auth/`)
+
+- **LoginScreen**: User login with email/password
+- **SignupScreen**: New user registration
+- **ForgotPasswordScreen**: Password recovery flow
+- **OTPVerificationScreen**: OTP verification for password reset
+- **ResetPasswordScreen**: New password setup
+
+### 🚀 Core (`src/screens/core/`)
+
+- **SplashScreen**: App initialization and loading
+
+### ⏱️ Activity Management (`src/screens/activity/`)
+
+- **ActivityScreen**: Main activity list with timer controls
+- **ActivityDetailScreen**: Detailed activity view and editing
+
+### 📋 Task Management (`src/screens/task/`)
+
+- **TaskScreen**: Task list with creation and management
+- **TaskDetailScreen**: Detailed task view and editing
+
+### 📊 Analytics (`src/screens/analytics/`)
+
+- **StatsScreen**: Productivity statistics and insights
+
+### ⚙️ Settings (`src/screens/settings/`)
+
+- **SettingsScreen**: App configuration and preferences
 
 ## Key Components
 
@@ -85,6 +157,7 @@ src/
 - Error boundaries and fallback handling
 - Responsive font scaling
 - Production-ready architecture
+- Organized screen structure for better maintainability
 
 ## Running in Production
 
