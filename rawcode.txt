@@ -1,0 +1,1610 @@
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  StatusBar,
+  ScrollView,
+  Modal,
+  Alert,
+  Animated,
+  Vibration,
+  Platform,
+  PanResponder,
+  Dimensions,
+  GestureResponderEvent,
+  PanResponderGestureState,
+  TouchableWithoutFeedback,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import Icon from "react-native-vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
+import { RootStackParamList } from "../navigation";
+import { Activity, Category } from "../types";
+import AddActivityModal from "../components/AddActivityModal";
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+// Extended activity type with timer-related properties
+interface ActivityWithTimer extends Activity {
+  isRunning?: boolean;
+  currentTimer?: string;
+  elapsedSeconds?: number;
+  isFuture?: boolean;
+  priority: number;
+}
+
+// Helper function to format current date
+const formatDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}/${month}/${day}`;
+};
+
+// Mock API response for GET /api/activities
+const MOCK_ACTIVITIES_RESPONSE = {
+  success: true,
+  activities: [
+    {
+      id: "1",
+      title: "Gym",
+      category: "Personal" as Category,
+      startDate: "2022/02/03",
+      endDate: "2022/02/05",
+      duration: "01:30",
+      color: "#00E5FF",
+      elapsedSeconds: 0,
+      priority: 1,
+    },
+    {
+      id: "2",
+      title: "Copywriting",
+      category: "Personal" as Category,
+      startDate: "2022/02/05",
+      endDate: "2022/04/09",
+      duration: "05:27",
+      color: "#5B86E5",
+      elapsedSeconds: 10,
+      priority: 2,
+    },
+    {
+      id: "3",
+      title: "Design",
+      category: "Workout" as Category,
+      startDate: "2022/02/10",
+      endDate: "2022/04/13",
+      duration: "05:30",
+      color: "#753a88",
+      elapsedSeconds: 0,
+      priority: 3,
+    },
+    {
+      id: "4",
+      title: "Product Launch",
+      category: "Work" as Category,
+      startDate: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)), // 7 days in future
+      endDate: formatDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)), // 14 days in future
+      duration: "00:00",
+      color: "#FF5722",
+      elapsedSeconds: 0,
+      isFuture: true,
+      priority: 4,
+    },
+  ],
+};
+
+const LONG_PRESS_DURATION = 800; // ms to trigger long press
+const SWIPE_THRESHOLD = -80; // Minimum distance to trigger delete UI
+const CONFIRM_DELETE_THRESHOLD = -100; // Threshold to confirm delete
+
+const ActivityScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
+  const [activeTab, setActiveTab] = useState("ACTIVITY");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [jsonModalVisible, setJsonModalVisible] = useState(false);
+  const [selectedActivity, setSelectedActivity] =
+    useState<ActivityWithTimer | null>(null);
+  const [apiRequests, setApiRequests] = useState<any[]>([]);
+  const [apiResponses, setApiResponses] = useState<any[]>([]);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [activityToDelete, setActivityToDelete] =
+    useState<ActivityWithTimer | null>(null);
+  const [longPressedId, setLongPressedId] = useState<string | null>(null);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const longPressTimeout = useRef<NodeJS.Timeout | null>(null);
+  const itemHeight = 90 + 15; // card height + marginBottom
+  const screenWidth = Dimensions.get("window").width;
+  const [swipingId, setSwipingId] = useState<string | null>(null);
+  const swipeAnim = useRef(new Animated.Value(0)).current;
+  const swipeAnimMap = useRef<Map<string, Animated.Value>>(new Map()).current;
+  const [showDeleteButton, setShowDeleteButton] = useState<string | null>(null);
+  const deleteIconAnim = useRef(new Animated.Value(1)).current;
+  const deleteButtonScale = useRef(new Animated.Value(1)).current;
+  const [deleteCardPressed, setDeleteCardPressed] = useState<string | null>(
+    null
+  );
+
+  // Initialize activities from mock API response
+  const [activities, setActivities] = useState<ActivityWithTimer[]>(
+    MOCK_ACTIVITIES_RESPONSE.activities.map((activity) => ({
+      ...activity,
+      isRunning: false,
+      currentTimer: "00:00",
+      elapsedSeconds: 0,
+    }))
+  );
+
+  // Move the isSwipedLeft state from renderActivityItem to component level
+  const [swipedItemIds, setSwipedItemIds] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  // Set swiped state for an activity
+  const setSwipedState = (id: string, isSwiped: boolean) => {
+    setSwipedItemIds((prev) => ({
+      ...prev,
+      [id]: isSwiped,
+    }));
+  };
+
+  // Get swiped state for an activity
+  const isItemSwiped = (id: string) => swipedItemIds[id] || false;
+
+  // Simulate fetching activities on component mount
+  useEffect(() => {
+    // Mock API request - GET /api/activities
+    const requestObject = {
+      method: "GET",
+      endpoint: "/api/activities",
+      headers: {
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      },
+    };
+
+    // Log the request
+    setApiRequests((prev) => [...prev, requestObject]);
+
+    // Log the response
+    setApiResponses((prev) => [...prev, MOCK_ACTIVITIES_RESPONSE]);
+
+    // Cleanup function for component unmount
+    return () => {
+      // Clear any pending timeouts
+      if (longPressTimeout.current) {
+        clearTimeout(longPressTimeout.current);
+      }
+
+      // Clear animation values
+      swipeAnimMap.forEach((anim) => {
+        anim.setValue(0);
+      });
+    };
+  }, []);
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(
+      remainingSeconds
+    ).padStart(2, "0")}`;
+  };
+
+  // Toggle timer for an activity
+  const toggleTimer = (id: string) => {
+    // Find the activity
+    const activity = activities.find((a) => a.id === id);
+    if (!activity) return;
+
+    // Create mock API request - PUT /api/activities/:id/timer
+    const isCurrentlyRunning = activity.isRunning || false;
+    const newIsRunning = !isCurrentlyRunning;
+
+    const requestObject = {
+      method: "PUT",
+      endpoint: `/api/activities/${id}/timer`,
+      headers: {
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "Content-Type": "application/json",
+      },
+      body: {
+        isRunning: newIsRunning,
+        elapsedSeconds: activity.elapsedSeconds || 0,
+      },
+    };
+
+    // Mock API response
+    const responseObject = {
+      success: true,
+      activity: {
+        id,
+        isRunning: newIsRunning,
+        elapsedSeconds: activity.elapsedSeconds || 0,
+        currentTimer: formatTime(activity.elapsedSeconds || 0),
+      },
+    };
+
+    // Log request and response
+    setApiRequests((prev) => [...prev, requestObject]);
+    setApiResponses((prev) => [...prev, responseObject]);
+
+    // Update local state
+    setActivities((prevActivities) =>
+      prevActivities.map((activity) => {
+        if (activity.id === id) {
+          return {
+            ...activity,
+            isRunning: !isCurrentlyRunning,
+          };
+        }
+        return activity;
+      })
+    );
+  };
+
+  // Update timers for running activities
+  useEffect(() => {
+    const timerInterval = setInterval(() => {
+      setActivities((prevActivities) =>
+        prevActivities.map((activity) => {
+          if (activity.isRunning) {
+            const elapsedSeconds = (activity.elapsedSeconds || 0) + 1;
+            return {
+              ...activity,
+              elapsedSeconds,
+              currentTimer: formatTime(elapsedSeconds),
+            };
+          }
+          return activity;
+        })
+      );
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, []);
+
+  // Get gradient colors based on activity
+  const getGradientColors = (activity: ActivityWithTimer): [string, string] => {
+    // Check if activity is in the future
+    const isFuture = isActivityInFuture(activity);
+    if (isFuture) {
+      // Use a muted version of the activity color for future activities
+      const baseColor = activity.color || "#00E5FF";
+      return [baseColor + "60", baseColor + "30"]; // 60 and 30 represent opacity in hex
+    }
+
+    // If activity is not running, return black gradient
+    if (!activity.isRunning) {
+      return ["#000000", "#222222"];
+    }
+
+    // Otherwise, return normal gradient based on activity type
+    if (activity.title === "Gym") {
+      return ["#36D1DC", "#5B86E5"];
+    } else if (activity.title === "Copywriting") {
+      return ["#5B86E5", "#336EFF"];
+    } else if (activity.title === "Design") {
+      return ["#753a88", "#cc2b5e"];
+    } else {
+      return [activity.color || "#00E5FF", "#5B86E5"];
+    }
+  };
+
+  // Check if an activity is in the future
+  const isActivityInFuture = (activity: ActivityWithTimer): boolean => {
+    if (activity.isFuture === true) return true;
+
+    const today = new Date();
+    const startDate = new Date(activity.startDate.replace(/\//g, "-"));
+    return startDate > today;
+  };
+
+  // Create pan responder for swipe to delete
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false, // Don't activate immediately on press
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only start responding to movement if there's significant movement
+        const { dx, dy } = gestureState;
+
+        // For horizontal movements (swipe to delete)
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+          return true;
+        }
+
+        return false;
+      },
+      onPanResponderGrant: (_, gestureState) => {
+        // Capture the item being interacted with
+        const index = Math.floor((gestureState.y0 - 200) / itemHeight);
+        if (index >= 0 && index < activities.length) {
+          const item = activities[index];
+          if (isActivityInFuture(item)) {
+            return;
+          }
+
+          // Set the swiping ID for delete gestures
+          if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+            setSwipingId(item.id);
+          }
+        }
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+
+        // Handle horizontal swipes for deletion
+        if (swipingId && Math.abs(dx) > Math.abs(dy)) {
+          // Only allow left swipes (negative dx)
+          if (dx < 0) {
+            // Animate the swipe with dampening effect
+            swipeAnim.setValue(Math.max(dx, -150));
+
+            // If swiped far enough, trigger haptic feedback and prepare for delete
+            if (dx < SWIPE_THRESHOLD && !deleteModalVisible) {
+              // Provide haptic feedback
+              if (Platform.OS === "ios" || Platform.OS === "android") {
+                Vibration.vibrate(50);
+              }
+
+              // Find the item being swiped
+              const item = activities.find((a) => a.id === swipingId);
+              if (item && !activityToDelete) {
+                setActivityToDelete(item);
+                setDeleteModalVisible(true);
+              }
+            }
+          }
+        }
+      },
+      onPanResponderRelease: () => {
+        // Reset swipe state if we were swiping
+        if (swipingId) {
+          Animated.spring(swipeAnim, {
+            toValue: 0,
+            friction: 5,
+            tension: 40,
+            useNativeDriver: true,
+          }).start(() => {
+            setSwipingId(null);
+          });
+        }
+      },
+      onPanResponderTerminate: () => {
+        // Reset states on termination
+        if (swipingId) {
+          Animated.spring(swipeAnim, {
+            toValue: 0,
+            friction: 5,
+            tension: 40,
+            useNativeDriver: true,
+          }).start(() => {
+            setSwipingId(null);
+          });
+        }
+      },
+    })
+  ).current;
+
+  // Handle long press to delete
+  const handleLongPress = (item: ActivityWithTimer) => {
+    // Skip future activities
+    if (isActivityInFuture(item)) return;
+
+    // Provide haptic feedback
+    Vibration.vibrate(50);
+    
+    // Set the activity to delete and show the confirmation modal
+    setActivityToDelete(item);
+    setDeleteModalVisible(true);
+  };
+
+  // Enhanced press-in handling for animation
+  const handlePressIn = (id: string) => {
+    setLongPressedId(id);
+    Animated.timing(scaleAnim, {
+      toValue: 0.97,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+
+    // Start long press timer
+    if (longPressTimeout.current) {
+      clearTimeout(longPressTimeout.current);
+    }
+  };
+
+  // Handle press out for animation
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 5,
+      tension: 40,
+      useNativeDriver: true,
+    }).start(() => {
+      setLongPressedId(null);
+    });
+
+    // Clear long press timer
+    if (longPressTimeout.current) {
+      clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+  };
+
+  // Handle delete activity
+  const handleDeleteActivity = () => {
+    if (!activityToDelete) return;
+
+    // Reset swiped state for the deleted item
+    setSwipedState(activityToDelete.id, false);
+
+    // Create mock API request for DELETE /api/activities/:id
+    const requestObject = {
+      method: "DELETE",
+      endpoint: `/api/activities/${activityToDelete.id}`,
+      headers: {
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      },
+    };
+
+    // Mock API response
+    const responseObject = {
+      success: true,
+      message: "Activity deleted successfully",
+    };
+
+    // Log request and response
+    setApiRequests((prev) => [...prev, requestObject]);
+    setApiResponses((prev) => [...prev, responseObject]);
+
+    // Remove the activity from the list
+    setActivities((prevActivities) =>
+      prevActivities.filter((activity) => activity.id !== activityToDelete.id)
+    );
+
+    // Close the delete modal
+    setDeleteModalVisible(false);
+    setActivityToDelete(null);
+  };
+
+  // Add this new function for rendering the delete action for swipe
+  const renderRightActions = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>,
+    item: ActivityWithTimer
+  ) => {
+    // This function is no longer used, we'll keep it minimally functional
+    return null;
+  };
+
+  // Start a pulsing animation for the delete icon
+  useEffect(() => {
+    if (Object.keys(swipedItemIds).some((id) => swipedItemIds[id])) {
+      // Create a repeating sequence with native driver for scale
+      const pulsateScale = Animated.sequence([
+        Animated.timing(deleteButtonScale, {
+          toValue: 1.1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(deleteButtonScale, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]);
+
+      // Start the animation loop
+      Animated.loop(pulsateScale).start();
+    } else {
+      // Reset scale if no items are swiped
+      deleteButtonScale.setValue(1);
+    }
+
+    return () => {
+      // Clean up
+      deleteButtonScale.stopAnimation();
+    };
+  }, [swipedItemIds]);
+
+  const renderActivityItem = ({
+    item,
+    index,
+  }: {
+    item: ActivityWithTimer;
+    index: number;
+  }) => {
+    const isFuture = isActivityInFuture(item);
+    const isSwipedLeft = isItemSwiped(item.id);
+
+    // Prevent swiping if it's a future activity
+    const canSwipe = !isFuture;
+
+    // Style modifiers based on state
+    const dynamicStyles = {
+      opacity: 1,
+      transform: [
+        {
+          scale: longPressedId === item.id ? scaleAnim : 1,
+        },
+      ],
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 5,
+      zIndex: 1,
+    };
+
+    // Create a simple pan responder to detect left swipe
+    const itemPanResponder = PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to significant horizontal movement for swipe when allowed
+        if (
+          canSwipe &&
+          Math.abs(gestureState.dx) > 10 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
+        ) {
+          return true;
+        }
+        return false;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // If swiped far enough to the left, show the delete UI
+        if (gestureState.dx < SWIPE_THRESHOLD && !isSwipedLeft && canSwipe) {
+          setSwipedState(item.id, true);
+          // Provide haptic feedback
+          Vibration.vibrate(50);
+        } else if (gestureState.dx > SWIPE_THRESHOLD && isSwipedLeft) {
+          setSwipedState(item.id, false);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        // If swiped far enough and released, show delete card
+        if (gestureState.dx < SWIPE_THRESHOLD && canSwipe) {
+          // We'll keep the swiped state but not automatically show the delete modal
+          // User needs to tap on the delete card to confirm
+
+          // Provide haptic feedback to indicate successful swipe
+          Vibration.vibrate(50);
+        } else {
+          setSwipedState(item.id, false); // Reset state on release
+        }
+      },
+      onPanResponderTerminate: () => {
+        setSwipedState(item.id, false); // Reset state on termination
+      },
+    });
+
+    return (
+      <Animated.View style={[styles.animatedContainer, dynamicStyles]}>
+        <View
+          style={styles.activityItem}
+          {...(canSwipe ? itemPanResponder.panHandlers : {})}
+        >
+          {/* Show delete UI when swiped left */}
+          {isSwipedLeft ? (
+            <TouchableOpacity
+              style={[
+                styles.deleteCardContent,
+                deleteCardPressed === item.id && styles.deleteCardPressed,
+              ]}
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent propagation to the TouchableWithoutFeedback
+
+                // Immediate feedback
+                setDeleteCardPressed(item.id);
+
+                // Ensure we set the activity to delete first
+                setActivityToDelete(item);
+
+                // Immediately show the delete modal (no delay)
+                setDeleteModalVisible(true);
+              }}
+              onPressIn={() => setDeleteCardPressed(item.id)}
+              onPressOut={() => setDeleteCardPressed(null)}
+              activeOpacity={0.7} // More responsive visual feedback
+              delayPressIn={0} // No delay for visual feedback
+              delayPressOut={0} // No delay for visual feedback
+              pressRetentionOffset={{
+                top: 20,
+                left: 20,
+                bottom: 20,
+                right: 20,
+              }} // Larger touch area
+            >
+              <Animated.View
+                style={[
+                  {
+                    transform: [{ scale: deleteButtonScale }],
+                    opacity: 1, // Using constant opacity instead of animated
+                  },
+                ]}
+              >
+                <Icon name="trash-outline" size={36} color="#fff" />
+                <Text style={styles.deleteCardText}>Tap to delete</Text>
+              </Animated.View>
+
+              {/* Cancel button to dismiss the delete card */}
+              <TouchableOpacity
+                style={styles.deleteCardCancelButton}
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent propagation
+                  setSwipedState(item.id, false);
+                }}
+                hitSlop={{ top: 20, right: 20, bottom: 20, left: 20 }} // Increased touch area
+                activeOpacity={0.5} // More responsive visual feedback
+              >
+                <Icon name="close" size={16} color="#fff" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.cardTouchable}
+              onPress={() => {
+                // Show JSON modal
+                setSelectedActivity(item);
+                setJsonModalVisible(true);
+
+                // Mock API request
+                const requestObject = {
+                  method: "GET",
+                  endpoint: `/api/activities/${item.id}`,
+                  headers: {
+                    Authorization:
+                      "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  },
+                };
+
+                // Mock API response
+                const responseObject = {
+                  success: true,
+                  activity: {
+                    ...item,
+                    sessions: [
+                      {
+                        date: item.startDate,
+                        duration: "00:45",
+                      },
+                      {
+                        date: formatDate(new Date()), // today
+                        duration: item.currentTimer || "00:00",
+                      },
+                    ],
+                  },
+                };
+
+                // Log request and response
+                setApiRequests((prev) => [...prev, requestObject]);
+                setApiResponses((prev) => [...prev, responseObject]);
+              }}
+              onLongPress={() => !isFuture && handleLongPress(item)}
+              onPressIn={() => handlePressIn(item.id)}
+              onPressOut={handlePressOut}
+              delayLongPress={LONG_PRESS_DURATION}
+              disabled={isFuture}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={getGradientColors(item)}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[
+                  styles.activityContent,
+                  isFuture && styles.futureActivityContent,
+                ]}
+              >
+                <View style={styles.cardLeft}>
+                  <Text
+                    style={[
+                      styles.activityTitle,
+                      isFuture && styles.futureActivityText,
+                    ]}
+                  >
+                    {item.title}
+                    {isFuture && " (Future)"}
+                  </Text>
+                  <View style={styles.datesContainer}>
+                    <View style={styles.dateContainer}>
+                      <Icon
+                        name="calendar-outline"
+                        size={16}
+                        color={isFuture ? "#aaa" : "#fff"}
+                      />
+                      <Text
+                        style={[
+                          styles.dateText,
+                          isFuture && styles.futureActivityText,
+                        ]}
+                      >
+                        {item.startDate}
+                      </Text>
+                    </View>
+                    <View style={styles.dateContainer}>
+                      <Icon
+                        name="calendar-outline"
+                        size={16}
+                        color={isFuture ? "#aaa" : "#fff"}
+                      />
+                      <Text
+                        style={[
+                          styles.dateText,
+                          isFuture && styles.futureActivityText,
+                        ]}
+                      >
+                        {item.endDate}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.cardRight}>
+                  <View style={styles.categoryContainer}>
+                    <Icon
+                      name="person-outline"
+                      size={14}
+                      color={isFuture ? "#aaa" : "#fff"}
+                    />
+                    <Text
+                      style={[
+                        styles.categoryText,
+                        isFuture && styles.futureActivityText,
+                      ]}
+                    >
+                      {item.category}
+                    </Text>
+                  </View>
+
+                  {!isFuture && (
+                    <TouchableOpacity
+                      style={[
+                        styles.playButton,
+                        item.isRunning && styles.playButtonActive,
+                      ]}
+                      onPress={(e) => {
+                        e.stopPropagation(); // Prevent triggering the card's onPress
+                        toggleTimer(item.id);
+                      }}
+                    >
+                      <Icon
+                        name={item.isRunning ? "pause" : "play"}
+                        size={20}
+                        color="#fff"
+                      />
+                    </TouchableOpacity>
+                  )}
+
+                  {item.isRunning && !isFuture && (
+                    <View style={styles.timerContainer}>
+                      <Text style={styles.timerText}>{item.currentTimer}</Text>
+                    </View>
+                  )}
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+      </Animated.View>
+    );
+  };
+
+  const handleAddActivity = (newActivity: Partial<Activity>) => {
+    // Create a new activity with a unique ID and timer properties
+    const activity = {
+      ...newActivity,
+      id: Date.now().toString(),
+      isRunning: false,
+      currentTimer: "00:00",
+      elapsedSeconds: 0,
+      duration: "00:00",
+      priority: activities.length + 1, // Add default priority as last item
+    } as ActivityWithTimer;
+
+    // Create mock API request for POST /api/activities
+    const requestObject = {
+      method: "POST",
+      endpoint: "/api/activities",
+      headers: {
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "Content-Type": "application/json",
+      },
+      body: newActivity,
+    };
+
+    // Mock API response
+    const responseObject = {
+      success: true,
+      activity,
+    };
+
+    // Log request and response
+    setApiRequests((prev) => [...prev, requestObject]);
+    setApiResponses((prev) => [...prev, responseObject]);
+
+    // Add to activities list
+    setActivities([...activities, activity]);
+
+    // Close modal
+    setModalVisible(false);
+  };
+
+  // Function to handle the swipe gesture for an activity
+  const handleSwipe = (
+    id: string,
+    gestureState: PanResponderGestureState,
+    finish: () => void
+  ) => {
+    const { dx } = gestureState;
+
+    // Create animation value if it doesn't exist
+    if (!swipeAnimMap.has(id)) {
+      swipeAnimMap.set(id, new Animated.Value(0));
+    }
+
+    const swipeAnim = swipeAnimMap.get(id)!;
+
+    // Only handle left swipes (negative dx)
+    if (dx < 0) {
+      // Set swiping ID
+      if (swipingId !== id) {
+        setSwipingId(id);
+      }
+
+      // Update swipe animation - limit the swipe distance to create resistance
+      const limitedDx = Math.max(dx, SWIPE_THRESHOLD * 1.2);
+      swipeAnim.setValue(limitedDx);
+
+      // If swiped far enough, show delete button
+      if (dx <= SWIPE_THRESHOLD && showDeleteButton !== id) {
+        setShowDeleteButton(id);
+        // Also update our swipe state
+        setSwipedState(id, true);
+        // Provide strong haptic feedback
+        Vibration.vibrate(40);
+      } else if (dx > SWIPE_THRESHOLD && showDeleteButton === id) {
+        setShowDeleteButton(null);
+        setSwipedState(id, false);
+      }
+
+      // If swiped far enough to confirm delete
+      if (dx <= CONFIRM_DELETE_THRESHOLD) {
+        // Find activity
+        const activity = activities.find((a) => a.id === id);
+        if (activity && !activityToDelete) {
+          // Vibrate to indicate delete action
+          Vibration.vibrate(70);
+          setActivityToDelete(activity);
+          setDeleteModalVisible(true);
+
+          // Reset the swipe
+          Animated.spring(swipeAnim, {
+            toValue: 0,
+            friction: 5,
+            tension: 40,
+            useNativeDriver: true,
+          }).start(() => {
+            setSwipingId(null);
+            setShowDeleteButton(null);
+            setSwipedState(id, false);
+            finish();
+          });
+        }
+      }
+    } else if (dx > 5) {
+      // Reset on positive (right) swipe - only if we've moved noticeably to the right
+      Animated.spring(swipeAnim, {
+        toValue: 0,
+        friction: 5,
+        tension: 40,
+        useNativeDriver: true,
+      }).start(() => {
+        setSwipingId(null);
+        setShowDeleteButton(null);
+        setSwipedState(id, false);
+        finish();
+      });
+    }
+  };
+
+  // Function to reset swipe when released
+  const resetSwipe = (id: string) => {
+    if (swipeAnimMap.has(id)) {
+      const swipeAnim = swipeAnimMap.get(id)!;
+      Animated.spring(swipeAnim, {
+        toValue: 0,
+        friction: 5,
+        tension: 40,
+        useNativeDriver: true,
+      }).start(() => {
+        if (swipingId === id) {
+          setSwipingId(null);
+        }
+        if (showDeleteButton === id && !deleteModalVisible) {
+          setShowDeleteButton(null);
+        }
+        // Reset swiped state for this item
+        setSwipedState(id, false);
+      });
+    }
+  };
+
+  // Function to dismiss all swiped items
+  const dismissAllSwipedItems = () => {
+    // Get all swiped item IDs
+    const swipedIds = Object.keys(swipedItemIds).filter(
+      (id) => swipedItemIds[id]
+    );
+
+    // Reset each one
+    swipedIds.forEach((id) => {
+      setSwipedState(id, false);
+    });
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <View style={styles.header}>
+        <View style={styles.profileContainer}>
+          <TouchableOpacity style={styles.profileImage}>
+            <Icon name="person" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Activity</Text>
+        </View>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.jsonButton}
+            onPress={() => setJsonModalVisible(true)}
+          >
+            <Icon name="code" size={22} color="#00E5FF" />
+          </TouchableOpacity>
+          <TouchableOpacity>
+            <Icon
+              name="stats-chart"
+              size={24}
+              color="#fff"
+              onPress={() =>
+                navigation.navigate("Stats", { title: "Statistics" })
+              }
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "ACTIVITY" && styles.activeTab]}
+          onPress={() => setActiveTab("ACTIVITY")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "ACTIVITY" && styles.activeTabText,
+            ]}
+          >
+            ACTIVITY
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "TASK" && styles.activeTab]}
+          onPress={() => setActiveTab("TASK")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "TASK" && styles.activeTabText,
+            ]}
+          >
+            TASK
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => setModalVisible(true)}
+      >
+        <Icon name="add" size={24} color="#fff" />
+        <Text style={styles.addButtonText}>Add new activity</Text>
+      </TouchableOpacity>
+
+      <View style={styles.instructionContainer}>
+        <View style={styles.instructionItem}>
+          <Icon name="arrow-back" size={16} color="#fff" />
+          <Text style={styles.instructionText}>Swipe left to delete</Text>
+        </View>
+        <View style={styles.instructionItem}>
+          <Icon name="finger-print" size={16} color="#fff" />
+          <Text style={styles.instructionText}>Hold to delete</Text>
+        </View>
+        {Object.values(swipedItemIds).some((swiped) => swiped) && (
+          <TouchableOpacity
+            style={styles.dismissSwipesButton}
+            onPress={dismissAllSwipedItems}
+            activeOpacity={0.7}
+          >
+            <Icon name="close-circle" size={16} color="#fff" />
+            <Text style={styles.instructionText}>Dismiss</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Activity List with tap anywhere to dismiss swiped cards */}
+      <View style={{ flex: 1 }}>
+        <FlatList
+          data={activities}
+          renderItem={renderActivityItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.activityList}
+          showsVerticalScrollIndicator={true}
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+          CellRendererComponent={({ children, style, ...props }: any) => (
+            <View style={style} {...props}>
+              {children}
+            </View>
+          )}
+          removeClippedSubviews={false} // Ensures animations aren't clipped
+        />
+      </View>
+
+      {/* Using the reusable AddActivityModal component */}
+      <AddActivityModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onAdd={handleAddActivity}
+      />
+
+      {/* JSON Data Modal */}
+      <Modal
+        visible={jsonModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setJsonModalVisible(false)}
+      >
+        <View style={styles.jsonModalOverlay}>
+          <View style={styles.jsonModalContent}>
+            <View style={styles.jsonModalHeader}>
+              <Text style={styles.jsonModalTitle}>API Data Overview</Text>
+              <TouchableOpacity onPress={() => setJsonModalVisible(false)}>
+                <Icon name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.jsonScrollView}>
+              {selectedActivity ? (
+                <View style={styles.selectedActivityInfo}>
+                  <Text style={styles.jsonSectionTitle}>
+                    Selected Activity:
+                  </Text>
+                  <View style={styles.jsonBox}>
+                    <Text style={styles.jsonText}>
+                      {JSON.stringify(selectedActivity, null, 2)}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              <Text style={styles.jsonSectionTitle}>API Requests:</Text>
+              {apiRequests.map((request, index) => (
+                <View key={`req-${index}`} style={styles.jsonBox}>
+                  <Text style={styles.jsonRequestTitle}>
+                    {request.method} {request.endpoint}
+                  </Text>
+                  <Text style={styles.jsonText}>
+                    {JSON.stringify(request, null, 2)}
+                  </Text>
+                </View>
+              ))}
+
+              <Text style={styles.jsonSectionTitle}>API Responses:</Text>
+              {apiResponses.map((response, index) => (
+                <View key={`res-${index}`} style={styles.jsonBox}>
+                  <Text style={styles.jsonResponseTitle}>
+                    Response {index + 1}
+                  </Text>
+                  <Text style={styles.jsonText}>
+                    {JSON.stringify(response, null, 2)}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setDeleteModalVisible(false);
+          if (activityToDelete) {
+            setSwipedState(activityToDelete.id, false);
+          }
+        }}
+        statusBarTranslucent={true}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => {
+            // Close modal when tapping outside
+            setDeleteModalVisible(false);
+            if (activityToDelete) {
+              setSwipedState(activityToDelete.id, false);
+            }
+          }}
+        >
+          <View style={styles.deleteModalOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View style={styles.deleteModalContent}>
+                <View style={styles.deleteModalIconContainer}>
+                  <Icon name="alert-circle" size={50} color="#FF3B30" />
+                </View>
+                <Text style={styles.deleteModalTitle}>Delete Activity</Text>
+
+                <Text style={styles.deleteModalText}>
+                  Are you sure you want to delete "{activityToDelete?.title}"?
+                  This action cannot be undone.
+                </Text>
+
+                <View style={styles.deleteModalButtons}>
+                  <TouchableOpacity
+                    style={styles.deleteModalCancelButton}
+                    onPress={() => {
+                      setDeleteModalVisible(false);
+                      if (activityToDelete) {
+                        setSwipedState(activityToDelete.id, false);
+                      }
+                    }}
+                    activeOpacity={0.7}
+                    delayPressIn={0}
+                  >
+                    <Text style={styles.deleteModalCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.deleteModalDeleteButton}
+                    onPress={handleDeleteActivity}
+                    activeOpacity={0.7}
+                    delayPressIn={0}
+                  >
+                    <Text style={styles.deleteModalDeleteText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#121212",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 20,
+  },
+  profileContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  jsonButton: {
+    marginRight: 16,
+  },
+  profileImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#444",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  tabContainer: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    backgroundColor: "#1E1E1E",
+    borderRadius: 25,
+    overflow: "hidden",
+    marginBottom: 20,
+    height: 42,
+  },
+  tab: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  activeTab: {
+    backgroundColor: "#00E5FF",
+    borderRadius: 25,
+  },
+  tabText: {
+    color: "#888",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  activeTabText: {
+    color: "#000",
+    fontWeight: "bold",
+  },
+  addButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    backgroundColor: "#1E1E1E",
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  addButtonText: {
+    color: "#fff",
+    marginLeft: 10,
+    fontSize: 15,
+  },
+  activityList: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  animatedContainer: {
+    marginBottom: 15,
+    // Make sure this doesn't clip our animations
+    overflow: "visible",
+  },
+  activityItem: {
+    borderRadius: 20,
+    overflow: "hidden",
+    height: 90,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+    // Important for swipe gestures
+    position: "relative",
+  },
+  futureActivityItem: {
+    opacity: 0.7,
+    borderWidth: 1,
+    borderColor: "#333",
+    borderStyle: "dashed",
+  },
+  activityContent: {
+    flexDirection: "row",
+    padding: 20,
+    height: "100%",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  futureActivityContent: {
+    opacity: 0.7,
+  },
+  cardLeft: {
+    flex: 2,
+    justifyContent: "center",
+  },
+  cardRight: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  activityTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 5,
+  },
+  futureActivityText: {
+    color: "#aaa",
+    opacity: 0.8,
+  },
+  datesContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dateContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  dateText: {
+    color: "#fff",
+    marginLeft: 5,
+    fontSize: 14,
+  },
+  categoryContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  categoryText: {
+    color: "#fff",
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  timerContainer: {
+    position: "absolute",
+    top: -30,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  timerText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  playButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  playButtonActive: {
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  cardTouchable: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    zIndex: 1,
+  },
+  deleteSwipeBackground: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 80,
+    backgroundColor: "#FF3B30",
+    justifyContent: "center",
+    alignItems: "center",
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
+    zIndex: 0,
+  },
+  instructionContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  instructionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  instructionText: {
+    color: "#fff",
+    marginLeft: 6,
+    fontSize: 12,
+  },
+  jsonModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  jsonModalContent: {
+    backgroundColor: "#1E1E1E",
+    borderRadius: 12,
+    maxHeight: "80%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  jsonModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333",
+  },
+  jsonModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  jsonScrollView: {
+    padding: 16,
+  },
+  selectedActivityInfo: {
+    marginBottom: 20,
+  },
+  jsonBox: {
+    backgroundColor: "#2C2C2E",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  jsonRequestTitle: {
+    color: "#36D1DC",
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+  jsonResponseTitle: {
+    color: "#5B86E5",
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+  jsonText: {
+    color: "#fff",
+    fontFamily: "monospace",
+    fontSize: 12,
+  },
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  deleteModalContent: {
+    backgroundColor: "#1E1E1E",
+    borderRadius: 12,
+    padding: 20,
+    width: "90%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 16,
+  },
+  deleteModalText: {
+    fontSize: 16,
+    color: "#ddd",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  deleteModalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  deleteModalCancelButton: {
+    flex: 1,
+    padding: 14,
+    backgroundColor: "#2C2C2E",
+    borderRadius: 8,
+    marginRight: 10,
+    alignItems: "center",
+  },
+  deleteModalCancelText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  deleteModalDeleteButton: {
+    flex: 1,
+    padding: 14,
+    backgroundColor: "#FF3B30",
+    borderRadius: 8,
+    marginLeft: 10,
+    alignItems: "center",
+  },
+  deleteModalDeleteText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  deleteModalIconContainer: {
+    marginBottom: 16,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255, 59, 48, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  jsonSectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#00E5FF",
+    marginVertical: 10,
+  },
+  deleteCardContent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FF3B30",
+    borderRadius: 20,
+    height: 90,
+    flexDirection: "column",
+  },
+  deleteCardPressed: {
+    backgroundColor: "#E02E24", // Darker red when pressed
+  },
+  deleteCardText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 8,
+    textAlign: "center",
+  },
+  deleteCardCancelButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dragIndicator: {
+    position: "absolute",
+    top: 150,
+    left: 0,
+    right: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 8,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    borderRadius: 20,
+    zIndex: 1000,
+  },
+  dragIndicatorText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  dismissSwipesButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 59, 48, 0.4)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+});
+
+export default ActivityScreen;
