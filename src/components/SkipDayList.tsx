@@ -3,7 +3,7 @@ import { View, StyleSheet, TouchableOpacity, FlatList } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { format } from "date-fns";
 import StyledText from "./StyledText";
-import { SkipDayEntry } from "../api/apiClient";
+import { SkipDayEntry } from "../api/shared";
 
 interface SkipDayListProps {
   skipDayEntries: SkipDayEntry[];

@@ -2,18 +2,21 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import SplashScreen from "../screens/SplashScreen";
-import LoginScreen from "../screens/LoginScreen";
-import SignupScreen from "../screens/SignupScreen";
-import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
-import OtpVerificationScreen from "../screens/OTPVerificationScreen";
-import ResetPasswordScreen from "../screens/ResetPasswordScreen";
-import ActivityScreen from "../screens/ActivityScreen";
-import ActivityDetailScreen from "../screens/ActivityDetailScreen";
-import StatsScreen from "../screens/StatsScreen";
-import SettingsScreen from "../screens/SettingsScreen";
-import TaskScreen from "../screens/TaskScreen";
-import TaskDetailScreen from "../screens/TaskDetailScreen";
+// Import screens from organized structure
+import {
+  SplashScreen,
+  LoginScreen,
+  SignupScreen,
+  ForgotPasswordScreen,
+  OTPVerificationScreen as OtpVerificationScreen,
+  ResetPasswordScreen,
+  ActivityScreen,
+  ActivityDetailScreen,
+  TaskScreen,
+  TaskDetailScreen,
+  StatsScreen,
+  SettingsScreen,
+} from "../screens";
 
 export type RootStackParamList = {
   Splash: undefined;
