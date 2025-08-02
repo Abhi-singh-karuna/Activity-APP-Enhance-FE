@@ -1,8 +1,8 @@
 // Settings API services exports
 export { default as settingsService } from "./settingsService";
 
-// Export constants and types
-export { ICON_OPTIONS, DEFAULT_COLORS, DEFAULT_ICONS } from "./settingsService";
+// Export constants
+export { ICON_OPTIONS } from "./settingsService";
 
 // Types from shared API client
 export type { SkipDayEntry, SkipDayDate } from "../../../api/shared";
@@ -21,6 +21,19 @@ export {
   createPriority,
   updatePriority,
   deletePriority,
+  getUserInfo,
   clearAllSettings,
   deleteAccount,
+} from "./settingsService";
+
+export type {
+  SettingItem,
+  ActivityCategory,
+  SkipReason,
+  PriorityLevel,
+  CreateSettingItemData,
+  UpdateSettingItemData,
+  UserInfo,
+  ClearDataRequest,
+  DeleteAccountRequest,
 } from "./settingsService";

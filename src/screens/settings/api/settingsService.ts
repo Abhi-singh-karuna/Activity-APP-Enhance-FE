@@ -74,6 +74,35 @@ export interface ApiItemDataResponse {
   item: ApiItemResponse;
 }
 
+// User Info interfaces
+export interface UserInfo {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  avatar?: string;
+  gender?: string;
+  dob?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiUserInfoResponse {
+  user_info: UserInfo;
+}
+
+// Clear/Delete Account interfaces
+export interface ClearDataRequest {
+  user_id?: string;
+  password?: string;
+}
+
+export interface DeleteAccountRequest {
+  user_id?: string;
+  password?: string;
+}
+
 // Default color options for settings
 // export const DEFAULT_COLORS = [
 //   "#00E5FF", // Electric Blue
@@ -559,42 +588,84 @@ export const deletePriority = async (id: string): Promise<ApiResponse> => {
   }
 };
 
-// Clear all settings
-export const clearAllSettings = async (): Promise<ApiResponse> => {
+// Delete account
+// User Info API
+export const getUserInfo = async (): Promise<ApiResponse<UserInfo>> => {
   try {
-    const response = await apiRequest({
-      method: "POST",
-      url: "/settings/clear-all-data",
-      data: {},
+    const response = await apiRequest<ApiUserInfoResponse>({
+      method: "GET",
+      url: "/settings/user-info",
     });
-    return response;
-  } catch (error) {
-    console.error("Error clearing settings:", error);
+
+    if (response.status && response.data?.user_info) {
+      return {
+        status: true,
+        data: response.data.user_info,
+      };
+    }
+
     return {
       status: false,
       error: {
-        code: "CLEAR_SETTINGS_FAILED",
-        message: "Failed to clear settings. Please try again.",
+        message: response.error?.message || "Failed to fetch user info",
+        code: "GET_USER_INFO_ERROR",
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching user info:", error);
+    return {
+      status: false,
+      error: {
+        message: "Failed to fetch user info",
+        code: "GET_USER_INFO_ERROR",
       },
     };
   }
 };
 
-// Delete account
-export const deleteAccount = async (): Promise<ApiResponse> => {
+// Clear All Data API
+export const clearAllSettings = async (
+  data: ClearDataRequest
+): Promise<ApiResponse> => {
   try {
     const response = await apiRequest({
-      method: "DELETE",
-      url: "/settings/delete-account",
+      method: "POST",
+      url: "/settings/clear-all-data",
+      data,
     });
+
+    return response;
+  } catch (error) {
+    console.error("Error clearing all data:", error);
+    return {
+      status: false,
+      error: {
+        message: "Failed to clear all data",
+        code: "CLEAR_ALL_DATA_ERROR",
+      },
+    };
+  }
+};
+
+// Delete Account API
+export const deleteAccount = async (
+  data: DeleteAccountRequest
+): Promise<ApiResponse> => {
+  try {
+    const response = await apiRequest({
+      method: "POST",
+      url: "/settings/delete-account",
+      data,
+    });
+
     return response;
   } catch (error) {
     console.error("Error deleting account:", error);
     return {
       status: false,
       error: {
-        code: "DELETE_ACCOUNT_FAILED",
-        message: "Failed to delete account. Please try again.",
+        message: "Failed to delete account",
+        code: "DELETE_ACCOUNT_ERROR",
       },
     };
   }
@@ -619,6 +690,9 @@ export const settingsService = {
   createPriority,
   updatePriority,
   deletePriority,
+
+  // User Info
+  getUserInfo,
 
   // Bulk operations
   clearAllSettings,

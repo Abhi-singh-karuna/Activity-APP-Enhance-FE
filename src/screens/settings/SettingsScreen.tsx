@@ -16,6 +16,7 @@ import {
   RefreshControl,
   Animated,
   LayoutAnimation,
+  Image,
 } from "react-native";
 
 import { useNavigation } from "@react-navigation/native";
@@ -24,7 +25,7 @@ import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { RootStackParamList } from "../../navigation";
 import { useAppContext } from "../../context/AppContext";
-import { settingsService } from "./api";
+import { settingsService, UserInfo } from "./api";
 
 // Icon options for the picker
 const ICON_OPTIONS = [
@@ -131,7 +132,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
     }
   };
 
-  const getButtonStyle = (buttonStyle: string) => {
+  const getButtonStyle = (buttonStyle: string): [string, string] => {
     switch (buttonStyle) {
       case "destructive":
         return ["#FF4757", "#FF6B81"];
@@ -161,9 +162,9 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
               <Icon name={icon.name} size={scale(24)} color={icon.color} />
               <Text style={customAlertStyles.title}>{title}</Text>
             </View>
-            
+
             <Text style={customAlertStyles.message}>{message}</Text>
-            
+
             <View style={customAlertStyles.buttonsContainer}>
               {buttons.map((button, index) => (
                 <TouchableOpacity
@@ -184,7 +185,9 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
                     <Text
                       style={[
                         customAlertStyles.buttonText,
-                        button.style === "cancel" && { color: ThemeColors.textSecondary },
+                        button.style === "cancel" && {
+                          color: ThemeColors.textSecondary,
+                        },
                       ]}
                     >
                       {button.text}
@@ -215,13 +218,16 @@ interface SettingItem {
 const useCustomAlert = () => {
   const [alertConfig, setAlertConfig] = useState<CustomAlertProps | null>(null);
 
-  const showAlert = useCallback((config: Omit<CustomAlertProps, 'visible' | 'onClose'>) => {
-    setAlertConfig({
-      ...config,
-      visible: true,
-      onClose: () => setAlertConfig(null),
-    });
-  }, []);
+  const showAlert = useCallback(
+    (config: Omit<CustomAlertProps, "visible" | "onClose">) => {
+      setAlertConfig({
+        ...config,
+        visible: true,
+        onClose: () => setAlertConfig(null),
+      });
+    },
+    []
+  );
 
   const hideAlert = useCallback(() => {
     setAlertConfig(null);
@@ -241,6 +247,7 @@ const SettingsScreen = () => {
   const [categories, setCategories] = useState<SettingItem[]>([]);
   const [skipReasons, setSkipReasons] = useState<SettingItem[]>([]);
   const [priorities, setPriorities] = useState<SettingItem[]>([]);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
   // Section visibility states
   const [categoriesVisible, setCategoriesVisible] = useState(true);
@@ -290,6 +297,18 @@ const SettingsScreen = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setPrioritiesVisible(!prioritiesVisible);
   }, [prioritiesVisible]);
+
+  // Load user info
+  const loadUserInfo = useCallback(async () => {
+    try {
+      const response = await settingsService.getUserInfo();
+      if (response.status && response.data) {
+        setUserInfo(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to load user info:", error);
+    }
+  }, []);
 
   // Load settings data
   const loadSettings = useCallback(async () => {
@@ -432,7 +451,8 @@ const SettingsScreen = () => {
 
   useEffect(() => {
     loadSettings();
-  }, [loadSettings]);
+    loadUserInfo();
+  }, [loadSettings, loadUserInfo]);
 
   // Settings management functions
   const handleAddItem = useCallback(async () => {
@@ -603,72 +623,82 @@ const SettingsScreen = () => {
         buttons: [{ text: "OK" }],
       });
     }
-  }, [editingItem, newItemName, selectedColor, selectedIcon, currentCategory, showAlert]);
+  }, [
+    editingItem,
+    newItemName,
+    selectedColor,
+    selectedIcon,
+    currentCategory,
+    showAlert,
+  ]);
 
-  const handleDeleteItem = useCallback(async (item: SettingItem) => {
-    showAlert({
-      title: "Delete Item",
-      message: `Delete "${item.name}"? This cannot be undone.`,
-      type: "warning",
-      buttons: [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Delete item using API
-              let response;
-              switch (item.category) {
-                case "categories":
-                  response = await settingsService.deleteCategory(item.id);
-                  break;
-                case "skipReasons":
-                  response = await settingsService.deleteSkipReason(item.id);
-                  break;
-                case "priorities":
-                  response = await settingsService.deletePriority(item.id);
-                  break;
-              }
-
-              if (response.status) {
-                // Refresh only the specific section
+  const handleDeleteItem = useCallback(
+    async (item: SettingItem) => {
+      showAlert({
+        title: "Delete Item",
+        message: `Delete "${item.name}"? This cannot be undone.`,
+        type: "warning",
+        buttons: [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                // Delete item using API
+                let response;
                 switch (item.category) {
                   case "categories":
-                    await refreshCategories();
+                    response = await settingsService.deleteCategory(item.id);
                     break;
                   case "skipReasons":
-                    await refreshSkipReasons();
+                    response = await settingsService.deleteSkipReason(item.id);
                     break;
                   case "priorities":
-                    await refreshPriorities();
+                    response = await settingsService.deletePriority(item.id);
                     break;
                 }
+
+                if (response.status) {
+                  // Refresh only the specific section
+                  switch (item.category) {
+                    case "categories":
+                      await refreshCategories();
+                      break;
+                    case "skipReasons":
+                      await refreshSkipReasons();
+                      break;
+                    case "priorities":
+                      await refreshPriorities();
+                      break;
+                  }
+                  showAlert({
+                    title: "Success",
+                    message: "Item deleted successfully!",
+                    type: "success",
+                    buttons: [{ text: "OK" }],
+                  });
+                } else {
+                  throw new Error(
+                    response.error?.message || "Failed to delete item"
+                  );
+                }
+              } catch (error) {
+                console.error("Failed to delete item:", error);
                 showAlert({
-                  title: "Success",
-                  message: "Item deleted successfully!",
-                  type: "success",
+                  title: "Error",
+                  message: "Failed to delete item. Please try again.",
+                  type: "error",
                   buttons: [{ text: "OK" }],
                 });
-              } else {
-                throw new Error(
-                  response.error?.message || "Failed to delete item"
-                );
               }
-            } catch (error) {
-              console.error("Failed to delete item:", error);
-              showAlert({
-                title: "Error",
-                message: "Failed to delete item. Please try again.",
-                type: "error",
-                buttons: [{ text: "OK" }],
-              });
-            }
+            },
           },
-        },
-      ],
-    });
-  }, [showAlert]);
+        ],
+      });
+    },
+    [showAlert]
+  );
 
   // Helper functions
   const getNextPriority = useCallback((): number => {
@@ -767,7 +797,9 @@ const SettingsScreen = () => {
     try {
       if (pendingAction === "clear") {
         // Clear all data using API
-        const response = await settingsService.clearAllSettings();
+        const response = await settingsService.clearAllSettings({
+          password: password,
+        });
         if (response.status) {
           setCategories([]);
           setSkipReasons([]);
@@ -783,7 +815,9 @@ const SettingsScreen = () => {
         }
       } else if (pendingAction === "delete") {
         // Delete account using API
-        const response = await settingsService.deleteAccount();
+        const response = await settingsService.deleteAccount({
+          password: password,
+        });
         if (response.status) {
           logout();
           navigation.navigate("Login");
@@ -854,7 +888,9 @@ const SettingsScreen = () => {
         >
           <View style={styles.settingItemContent}>
             <View style={styles.settingItemLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: item.color }]}>
+              <View
+                style={[styles.settingIcon, { backgroundColor: item.color }]}
+              >
                 <Icon name={item.icon} size={scale(18)} color="#fff" />
               </View>
               <View style={styles.settingItemInfo}>
@@ -1036,8 +1072,8 @@ const SettingsScreen = () => {
               colors={["rgba(28, 28, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
               style={styles.sectionGradient}
             >
-              <TouchableOpacity 
-                style={styles.sectionHeader} 
+              <TouchableOpacity
+                style={styles.sectionHeader}
                 onPress={toggleCategoriesVisibility}
                 activeOpacity={0.8}
               >
@@ -1079,10 +1115,10 @@ const SettingsScreen = () => {
                     </LinearGradient>
                   </TouchableOpacity>
                   <View style={styles.toggleIcon}>
-                    <Icon 
-                      name={categoriesVisible ? "chevron-up" : "chevron-down"} 
-                      size={scale(18)} 
-                      color={ThemeColors.textSecondary} 
+                    <Icon
+                      name={categoriesVisible ? "chevron-up" : "chevron-down"}
+                      size={scale(18)}
+                      color={ThemeColors.textSecondary}
                     />
                   </View>
                 </View>
@@ -1092,7 +1128,9 @@ const SettingsScreen = () => {
                 <View style={styles.sectionContent}>
                   {categories.length > 0 ? (
                     <View style={styles.settingsList}>
-                      {categories.map((item, index) => renderSettingItem(item, index))}
+                      {categories.map((item, index) =>
+                        renderSettingItem(item, index)
+                      )}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
@@ -1103,7 +1141,9 @@ const SettingsScreen = () => {
                           color={ThemeColors.textTertiary}
                         />
                       </View>
-                      <Text style={styles.emptyStateText}>No categories yet</Text>
+                      <Text style={styles.emptyStateText}>
+                        No categories yet
+                      </Text>
                       <TouchableOpacity
                         style={styles.emptyStateButton}
                         onPress={() => showModal("categories")}
@@ -1130,8 +1170,8 @@ const SettingsScreen = () => {
               colors={["rgba(28, 28, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
               style={styles.sectionGradient}
             >
-              <TouchableOpacity 
-                style={styles.sectionHeader} 
+              <TouchableOpacity
+                style={styles.sectionHeader}
                 onPress={toggleSkipReasonsVisibility}
                 activeOpacity={0.8}
               >
@@ -1173,10 +1213,10 @@ const SettingsScreen = () => {
                     </LinearGradient>
                   </TouchableOpacity>
                   <View style={styles.toggleIcon}>
-                    <Icon 
-                      name={skipReasonsVisible ? "chevron-up" : "chevron-down"} 
-                      size={scale(18)} 
-                      color={ThemeColors.textSecondary} 
+                    <Icon
+                      name={skipReasonsVisible ? "chevron-up" : "chevron-down"}
+                      size={scale(18)}
+                      color={ThemeColors.textSecondary}
                     />
                   </View>
                 </View>
@@ -1186,7 +1226,9 @@ const SettingsScreen = () => {
                 <View style={styles.sectionContent}>
                   {skipReasons.length > 0 ? (
                     <View style={styles.settingsList}>
-                      {skipReasons.map((item, index) => renderSettingItem(item, index))}
+                      {skipReasons.map((item, index) =>
+                        renderSettingItem(item, index)
+                      )}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
@@ -1197,13 +1239,17 @@ const SettingsScreen = () => {
                           color={ThemeColors.textTertiary}
                         />
                       </View>
-                      <Text style={styles.emptyStateText}>No skip reasons yet</Text>
+                      <Text style={styles.emptyStateText}>
+                        No skip reasons yet
+                      </Text>
                       <TouchableOpacity
                         style={styles.emptyStateButton}
                         onPress={() => showModal("skipReasons")}
                         activeOpacity={0.7}
                       >
-                        <Text style={styles.emptyStateButtonText}>Add First Reason</Text>
+                        <Text style={styles.emptyStateButtonText}>
+                          Add First Reason
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -1220,8 +1266,8 @@ const SettingsScreen = () => {
               colors={["rgba(28, 28, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
               style={styles.sectionGradient}
             >
-              <TouchableOpacity 
-                style={styles.sectionHeader} 
+              <TouchableOpacity
+                style={styles.sectionHeader}
                 onPress={togglePrioritiesVisibility}
                 activeOpacity={0.8}
               >
@@ -1263,10 +1309,10 @@ const SettingsScreen = () => {
                     </LinearGradient>
                   </TouchableOpacity>
                   <View style={styles.toggleIcon}>
-                    <Icon 
-                      name={prioritiesVisible ? "chevron-up" : "chevron-down"} 
-                      size={scale(18)} 
-                      color={ThemeColors.textSecondary} 
+                    <Icon
+                      name={prioritiesVisible ? "chevron-up" : "chevron-down"}
+                      size={scale(18)}
+                      color={ThemeColors.textSecondary}
                     />
                   </View>
                 </View>
@@ -1276,7 +1322,9 @@ const SettingsScreen = () => {
                 <View style={styles.sectionContent}>
                   {priorities.length > 0 ? (
                     <View style={styles.settingsList}>
-                      {priorities.map((item, index) => renderSettingItem(item, index))}
+                      {priorities.map((item, index) =>
+                        renderSettingItem(item, index)
+                      )}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
@@ -1326,7 +1374,9 @@ const SettingsScreen = () => {
                   </View>
                   <View style={styles.sectionHeaderText}>
                     <Text style={styles.sectionTitle}>Account</Text>
-                    <Text style={styles.sectionSubtitle}>Manage your account settings</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      Manage your account settings
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -1334,24 +1384,46 @@ const SettingsScreen = () => {
               <View style={styles.sectionContent}>
                 <View style={styles.accountCard}>
                   <LinearGradient
-                    colors={["rgba(0, 229, 255, 0.15)", "rgba(156, 108, 218, 0.15)"]}
+                    colors={[
+                      "rgba(0, 229, 255, 0.15)",
+                      "rgba(156, 108, 218, 0.15)",
+                    ]}
                     style={styles.accountCardGradient}
                   >
                     <View style={styles.accountInfo}>
                       <View style={styles.accountAvatar}>
-                        <LinearGradient
-                          colors={[ThemeColors.primary, ThemeColors.secondary]}
-                          style={styles.accountAvatarGradient}
-                        >
-                          <Icon name="person" size={scale(24)} color="#fff" />
-                        </LinearGradient>
+                        {userInfo?.avatar ? (
+                          <Image
+                            source={{ uri: userInfo.avatar }}
+                            style={styles.accountAvatarImage}
+                          />
+                        ) : (
+                          <LinearGradient
+                            colors={[
+                              ThemeColors.primary,
+                              ThemeColors.secondary,
+                            ]}
+                            style={styles.accountAvatarGradient}
+                          >
+                            <Icon name="person" size={scale(24)} color="#fff" />
+                          </LinearGradient>
+                        )}
                       </View>
                       <View style={styles.accountDetails}>
-                        <Text style={styles.accountName}>User Account</Text>
-                        <Text style={styles.accountEmail}>user@example.com</Text>
+                        <Text style={styles.accountName}>
+                          {userInfo?.name || "User Account"} 
+                        </Text>
+                        <Text style={styles.accountEmail}>
+                          {userInfo?.email || "user@example.com"}
+                        </Text>
                         <Text style={styles.accountStatus}>
-                          <Icon name="shield-checkmark" size={scale(12)} color={ThemeColors.success} />
-                          {" "}Active
+                          <Icon
+                            name="shield-checkmark"
+                            size={scale(12)}
+                            color={ThemeColors.success}
+                          />{" "}
+                          {userInfo?.status || "Active"}
+                          
                         </Text>
                       </View>
                     </View>
@@ -1365,7 +1437,9 @@ const SettingsScreen = () => {
                         style={styles.improvedLogoutButtonGradient}
                       >
                         <Icon name="log-out" size={scale(18)} color="#fff" />
-                        <Text style={styles.improvedLogoutButtonText}>Logout</Text>
+                        <Text style={styles.improvedLogoutButtonText}>
+                          Logout
+                        </Text>
                       </LinearGradient>
                     </TouchableOpacity>
                   </LinearGradient>
@@ -1394,7 +1468,10 @@ const SettingsScreen = () => {
                   </View>
                   <View style={styles.sectionHeaderText}>
                     <Text
-                      style={[styles.sectionTitle, { color: ThemeColors.danger }]}
+                      style={[
+                        styles.sectionTitle,
+                        { color: ThemeColors.danger },
+                      ]}
                     >
                       Danger Zone
                     </Text>
@@ -1413,7 +1490,10 @@ const SettingsScreen = () => {
                     activeOpacity={0.8}
                   >
                     <LinearGradient
-                      colors={["rgba(255, 149, 0, 0.25)", "rgba(255, 149, 0, 0.15)"]}
+                      colors={[
+                        "rgba(255, 149, 0, 0.25)",
+                        "rgba(255, 149, 0, 0.15)",
+                      ]}
                       style={styles.dangerButtonGradient}
                     >
                       <Icon
@@ -1438,7 +1518,10 @@ const SettingsScreen = () => {
                     activeOpacity={0.8}
                   >
                     <LinearGradient
-                      colors={["rgba(255, 71, 87, 0.25)", "rgba(255, 71, 87, 0.15)"]}
+                      colors={[
+                        "rgba(255, 71, 87, 0.25)",
+                        "rgba(255, 71, 87, 0.15)",
+                      ]}
                       style={styles.dangerButtonGradient}
                     >
                       <Icon
@@ -2067,6 +2150,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  accountAvatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: scale(25),
   },
   accountDetails: {
     flex: 1,
