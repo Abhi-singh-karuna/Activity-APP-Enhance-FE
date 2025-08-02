@@ -19,7 +19,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation";
 import Toast, { ToastType } from "../../components/Toast";
-import { authService } from "../../api";
+import { authService } from "./api";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -103,7 +103,7 @@ const ForgotPasswordScreen = () => {
         email: email.trim(),
       });
 
-      if (response.success) {
+      if (response.status) {
         setEmailSent(true);
         showToast("OTP sent to your email successfully!", "success");
 
@@ -587,6 +587,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flexDirection: "row",
+
     alignItems: "center",
   },
   loadingText: {

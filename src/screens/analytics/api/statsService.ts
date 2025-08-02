@@ -1,4 +1,4 @@
-import { apiRequest, ApiResponse } from "../apiClient";
+import { apiRequest, ApiResponse } from "../../../api/shared";
 
 // Statistics interfaces
 export interface CompletionRate {

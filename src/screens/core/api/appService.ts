@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiRequest, ApiResponse } from "../apiClient";
+import { apiRequest, ApiResponse } from "../../../api/shared";
 
 // Interface for app initialization data
 export interface AppInitData {
@@ -73,15 +73,16 @@ const DEFAULT_APP_INIT_DATA: AppInitData = {
 export const initializeApp = async (): Promise<ApiResponse<AppInitData>> => {
   try {
     const response = await apiRequest<AppInitData>({
-      method: "GET",
-      url: "/app/init",
+      method: "POST",
+      url: "/app/initialize",
+      data: {},
     });
     return response;
   } catch (error) {
     console.error("App initialization error:", error);
     // Fallback to default data
     return {
-      success: true,
+      status: true,
       data: DEFAULT_APP_INIT_DATA,
     };
   }
@@ -110,7 +111,7 @@ export const checkForUpdates = async (): Promise<
   } catch (error) {
     console.error("Update check error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "UPDATE_CHECK_FAILED",
         message: "Failed to check for updates. Please try again.",
@@ -132,7 +133,7 @@ export const getAnnouncements = async (): Promise<ApiResponse<Array<any>>> => {
   } catch (error) {
     console.error("Get announcements error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "ANNOUNCEMENTS_FETCH_FAILED",
         message: "Failed to get announcements. Please try again.",
@@ -157,7 +158,7 @@ export const acknowledgeAnnouncement = async (
   } catch (error) {
     console.error("Acknowledge announcement error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "ANNOUNCEMENT_ACKNOWLEDGE_FAILED",
         message: "Failed to acknowledge announcement. Please try again.",
@@ -189,7 +190,7 @@ export const checkMaintenance = async (): Promise<
   } catch (error) {
     console.error("Maintenance check error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "MAINTENANCE_CHECK_FAILED",
         message: "Failed to check maintenance status. Please try again.",
@@ -214,7 +215,7 @@ export const sendFeedback = async (
   } catch (error) {
     console.error("Send feedback error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "FEEDBACK_SEND_FAILED",
         message: "Failed to send feedback. Please try again.",
@@ -240,7 +241,7 @@ export const logError = async (
     // Just log but don't throw - this is a non-critical operation
     console.error("Error reporting failed:", err);
     return {
-      success: false,
+      status: false,
       error: {
         code: "ERROR_LOG_FAILED",
         message: "Failed to log error.",
@@ -262,7 +263,7 @@ export const getRemoteConfig = async (): Promise<ApiResponse<RemoteConfig>> => {
   } catch (error) {
     console.error("Get remote config error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "REMOTE_CONFIG_FETCH_FAILED",
         message: "Failed to get remote configuration. Please try again.",

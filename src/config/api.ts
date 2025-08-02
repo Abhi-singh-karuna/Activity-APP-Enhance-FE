@@ -2,7 +2,7 @@
 export const API_CONFIG = {
   // Mock Server Configuration - Using a public mock API service
   MOCK_SERVER: {
-    baseURL: "https://79ed90f2-b33a-4387-9043-861ee3ca954a.mock.pstmn.io/api", // Replace with your mock server URL
+    baseURL: "https://mock.apidog.com/m1/1023669-1010327-default", // Replace with your mock server URL
     timeout: 15000,
   },
 

@@ -14,7 +14,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation";
 import Icon from "react-native-vector-icons/Ionicons";
 import StyledText from "../../components/StyledText";
-import { appService } from "../../api";
+import { appService } from "./api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, {
   Circle,
@@ -162,8 +162,7 @@ const SplashScreen = () => {
         startAnimations();
 
         const initResult = await appService.initializeApp();
-
-        if (!initResult.success) {
+        if (!initResult.status) {
           console.error("App initialization failed:", initResult.error);
           setInitError(
             initResult.error?.message ||

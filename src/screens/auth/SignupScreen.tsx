@@ -20,7 +20,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation";
 import StyledText from "../../components/StyledText";
 import Toast, { ToastType } from "../../components/Toast";
-import { authService, RegisterRequest } from "../../api";
+import { authService, RegisterRequest } from "./api";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -132,7 +132,7 @@ const SignUpScreen = () => {
 
       const response = await authService.register(registerRequest);
 
-      if (response.success) {
+      if (response.status) {
         showToast(
           "Account created successfully! Please check your email to verify your account.",
           "success"

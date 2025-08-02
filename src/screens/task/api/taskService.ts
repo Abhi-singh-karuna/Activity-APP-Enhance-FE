@@ -1,5 +1,5 @@
-import { apiRequest, ApiResponse } from "../apiClient";
-import { Category } from "../../types";
+import { apiRequest, ApiResponse } from "../../../api/shared";
+import { Category } from "../../../types";
 
 // Task interfaces
 export interface Task {

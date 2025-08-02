@@ -1,75 +1,37 @@
-// API Client and Core
-export {
-  apiClient,
-  apiRequest,
-  ApiResponse,
-  ApiError,
-  ErrorCode,
-} from "./apiClient";
-export { setAuthTokens, clearAuthTokens, getAuthToken } from "./apiClient";
+// Main API exports - organized by feature groups
 
-// Auth Service
-export { default as authService } from "./services/authService";
-export type {
-  LoginRequest,
-  LoginResponse,
-  RegisterRequest,
-  ForgotPasswordRequest,
-  UserProfile,
-} from "./services/authService";
+// Shared API utilities
+export * from "./shared";
 
-// Activity Service
-export { default as activityService } from "./services/activityService";
-export type {
-  Activity,
-  CreateActivityRequest,
-  UpdateActivityRequest,
-  ActivityTimerResponse,
-  ActivityCompletionResponse,
-  ActivityQueryParams,
-} from "./services/activityService";
+// Auth API services
+export * from "../screens/auth/api";
 
-// Task Service
-export { default as taskService } from "./services/taskService";
-export type {
-  Task,
-  CreateTaskRequest,
-  UpdateTaskRequest,
-  TaskToggleResponse,
-  TaskQueryParams,
-} from "./services/taskService";
+// Core API services
+export * from "../screens/core/api";
 
-// Statistics Service
-export { default as statsService } from "./services/statsService";
-export type {
-  StatsData,
-  CompletionRate,
-  DailyStats,
-  TaskStats,
-  DailyTaskCompletion,
-  StatsQueryParams,
-} from "./services/statsService";
+// Activity API services
+export * from "../screens/activity/api";
 
-// Settings Service
-export { default as settingsService } from "./services/settingsService";
-export type { UserSettings } from "./services/settingsService";
+// Task API services
+export * from "../screens/task/api";
 
-// App Service
-export { default as appService } from "./services/appService";
-export type {
-  AppInitData,
-  FeedbackRequest,
-  ErrorLogRequest,
-  RemoteConfig,
-} from "./services/appService";
+// Analytics API services
+export * from "../screens/analytics/api";
+
+// Settings API services
+export * from "../screens/settings/api";
 
 // Legacy exports for backward compatibility
-export { getUserSettings, getCategories, updateCategories } from "./apiClient";
-export { getSkipReasons, updateSkipReasons } from "./apiClient";
+export {
+  getUserSettings,
+  getCategories,
+  updateCategories,
+} from "../screens/settings/api";
+export { getSkipReasons, updateSkipReasons } from "../screens/settings/api";
 export {
   getSkipDayEntries,
   addSkipDayEntry,
   updateSkipDayEntry,
   deleteSkipDayEntry,
-} from "./apiClient";
-export { updateFontSizeScale } from "./apiClient";
+} from "../screens/settings/api";
+export { updateFontSizeScale } from "../screens/settings/api";

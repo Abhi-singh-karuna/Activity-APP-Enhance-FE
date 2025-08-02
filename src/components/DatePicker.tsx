@@ -17,7 +17,7 @@ import {
   parseISO,
 } from "date-fns";
 import StyledText from "./StyledText";
-import { SkipDayDate } from "../api/apiClient";
+import { SkipDayDate } from "../api/shared";
 
 interface DatePickerProps {
   selectedDates: SkipDayDate[];

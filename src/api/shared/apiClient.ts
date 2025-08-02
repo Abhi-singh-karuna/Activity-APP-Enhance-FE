@@ -1,7 +1,11 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, {
+  AxiosInstance,
+  InternalAxiosRequestConfig,
+  AxiosResponse,
+} from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { CURRENT_API_CONFIG } from "../config/api";
+import { CURRENT_API_CONFIG } from "../../config/api";
 
 // API Configuration
 const API_CONFIG = {
@@ -14,13 +18,15 @@ const API_CONFIG = {
 
 // Response interface for all API calls
 export interface ApiResponse<T = any> {
-  success: boolean;
+  status: boolean;
   message?: string;
   data?: T;
   error?: {
     code: string;
     message: string;
+    details?: string;
   };
+  total_count?: number;
 }
 
 // Error types
@@ -56,7 +62,7 @@ const createApiClient = (): AxiosInstance => {
 
   // Request interceptor to add auth token
   client.interceptors.request.use(
-    async (config: AxiosRequestConfig) => {
+    async (config: InternalAxiosRequestConfig) => {
       try {
         const token = await AsyncStorage.getItem("accessToken");
         if (token && config.headers) {
@@ -117,7 +123,7 @@ const createApiClient = (): AxiosInstance => {
         throw new ApiError("Access forbidden", ErrorCode.FORBIDDEN, 403);
       } else if (response?.status === 404) {
         throw new ApiError("Resource not found", ErrorCode.NOT_FOUND, 404);
-      } else if (response?.status >= 500) {
+      } else if (response?.status && response.status >= 500) {
         throw new ApiError(
           "Server error",
           ErrorCode.SERVER_ERROR,
@@ -138,9 +144,7 @@ const createApiClient = (): AxiosInstance => {
 export const apiClient = createApiClient();
 
 // Generic API request function
-export const apiRequest = async <T>(
-  config: AxiosRequestConfig
-): Promise<ApiResponse<T>> => {
+export const apiRequest = async <T>(config: any): Promise<ApiResponse<T>> => {
   try {
     const response = await apiClient(config);
     return response.data;
@@ -162,7 +166,7 @@ export const apiRequest = async <T>(
         throw new ApiError("Forbidden", ErrorCode.FORBIDDEN, status);
       } else if (status === 404) {
         throw new ApiError("Not found", ErrorCode.NOT_FOUND, status);
-      } else if (status >= 500) {
+      } else if (status && status >= 500) {
         throw new ApiError("Server error", ErrorCode.SERVER_ERROR, status);
       } else {
         throw new ApiError(message, ErrorCode.NETWORK_ERROR, status);

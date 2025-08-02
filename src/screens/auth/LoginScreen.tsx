@@ -22,7 +22,7 @@ import { RootStackParamList } from "../../navigation";
 import StyledText from "../../components/StyledText";
 import { useAppContext } from "../../context/AppContext";
 import Toast, { ToastType } from "../../components/Toast";
-import { authService, LoginRequest } from "../../api";
+import { authService, LoginRequest } from "./api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Get device dimensions
@@ -114,7 +114,7 @@ const LoginScreen = () => {
       // Call the API
       const response = await authService.login(loginRequest);
 
-      if (response.success && response.data) {
+      if (response.status && response.data) {
         // Successful login
         showToast("Login successful! Welcome back.", "success");
 

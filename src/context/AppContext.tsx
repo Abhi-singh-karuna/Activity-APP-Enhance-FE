@@ -1,20 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SkipDayEntry, SkipDayDate } from "../api/apiClient";
-import {
-  settingsService,
-  authService,
-  getUserSettings,
-  getCategories,
-  getSkipReasons,
-  getSkipDayEntries,
-  updateFontSizeScale,
-  updateCategories,
-  updateSkipReasons,
-  addSkipDayEntry,
-  updateSkipDayEntry,
-  deleteSkipDayEntry,
-} from "../api";
+import { SkipDayEntry, SkipDayDate } from "../api/shared";
+import { settingsService } from "../screens/settings/api";
+import { authService } from "../screens/auth/api";
 
 interface AppContextType {
   fontSizeScale: number;
@@ -97,23 +85,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           console.warn("Failed to load login state from storage:", error);
         }
 
-        // Fetch user settings (includes font size) using our API service
-        try {
-          const settingsResponse = await getUserSettings();
-          if (settingsResponse.success && settingsResponse.data) {
-            const { fontSizeScale: apiFontSize } = settingsResponse.data;
-            if (apiFontSize) {
-              setFontSizeScaleState(apiFontSize);
-            }
-          }
-        } catch (error) {
-          console.warn("Failed to load user settings:", error);
-        }
+        // Font size is managed locally in state
 
         // Fetch categories using our API service
         try {
-          const categoriesResponse = await getCategories();
-          if (categoriesResponse.success && categoriesResponse.data) {
+          const categoriesResponse = await settingsService.getCategories();
+          if (categoriesResponse.status && categoriesResponse.data) {
             setCategoriesState(categoriesResponse.data);
           }
         } catch (error) {

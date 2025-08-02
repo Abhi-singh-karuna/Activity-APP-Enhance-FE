@@ -20,7 +20,7 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation";
 import Toast, { ToastType } from "../../components/Toast";
-import { authService } from "../../api";
+import { authService } from "./api";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -168,7 +168,7 @@ const OtpVerificationScreen = () => {
         otp: otpToVerify,
       });
 
-      if (response.success) {
+      if (response.status) {
         showToast("OTP verified successfully!", "success");
 
         // Navigate to Reset Password screen
@@ -208,7 +208,7 @@ const OtpVerificationScreen = () => {
     try {
       const response = await authService.resendOtp({ email });
 
-      if (response.success) {
+      if (response.status) {
         showToast("New OTP sent to your email!", "success");
         setTimer(60);
         setCanResend(false);

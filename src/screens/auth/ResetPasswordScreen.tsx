@@ -19,7 +19,7 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation";
 import Toast, { ToastType } from "../../components/Toast";
-import { authService } from "../../api";
+import { authService } from "./api";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -149,7 +149,7 @@ const ResetPasswordScreen = () => {
         confirmPassword,
       });
 
-      if (response.success) {
+      if (response.status) {
         setShowSuccess(true);
 
         // Success animation

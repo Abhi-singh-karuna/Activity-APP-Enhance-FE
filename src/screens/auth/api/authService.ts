@@ -4,7 +4,7 @@ import {
   setAuthTokens,
   clearAuthTokens,
   ApiResponse,
-} from "../apiClient";
+} from "../../../api/shared";
 
 /**
  * Login request payload
@@ -18,7 +18,7 @@ export interface LoginRequest {
  * Login response
  */
 export interface LoginResponse {
-  success: boolean;
+  status: boolean;
   message?: string;
   error?: {
     code: string;
@@ -29,17 +29,11 @@ export interface LoginResponse {
       id: string;
       email: string;
       name: string;
-      isVerified: boolean;
+      created_at?: string;
     };
-    tokens?: {
-      accessToken: string;
-      refreshToken: string;
-      expiresIn: number;
-    };
+    token?: string;
   };
-  token?: string;
-  refreshToken?: string;
-  user?: any;
+  total_count?: number;
 }
 
 // Interface for registration request
@@ -89,31 +83,39 @@ export const login = async (
   credentials: LoginRequest
 ): Promise<ApiResponse<LoginResponse["data"]>> => {
   try {
-    const response = await apiRequest<LoginResponse["data"]>({
+    const response = await apiRequest<LoginResponse>({
       method: "POST",
       url: "/auth/login",
       data: credentials,
     });
 
+    // Convert response format to match our internal format
+    const convertedResponse = {
+      status: response.status || false,
+      message: response.message,
+      data: response.data,
+      error: response.error,
+    };
+
     // If login successful, save tokens
-    if (response.success && response.data?.tokens) {
-      const { accessToken, refreshToken } = response.data.tokens;
-      await setAuthTokens(accessToken, refreshToken);
+    if (convertedResponse.status && convertedResponse.data?.token) {
+      const { token } = convertedResponse.data;
+      await AsyncStorage.setItem("accessToken", token);
 
       // Save user data
-      if (response.data.user) {
+      if (convertedResponse.data.user) {
         await AsyncStorage.setItem(
           "userData",
-          JSON.stringify(response.data.user)
+          JSON.stringify(convertedResponse.data.user)
         );
       }
     }
 
-    return response;
+    return convertedResponse;
   } catch (error) {
     console.error("Login error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "LOGIN_FAILED",
         message: "Login failed. Please check your credentials and try again.",
@@ -136,9 +138,9 @@ export const register = async (
     });
 
     // If registration successful, save tokens
-    if (response.success && response.data?.tokens) {
-      const { accessToken, refreshToken } = response.data.tokens;
-      await setAuthTokens(accessToken, refreshToken);
+    if (response.status && response.data?.token) {
+      const { token } = response.data;
+      await AsyncStorage.setItem("accessToken", token);
 
       // Save user data
       if (response.data.user) {
@@ -153,7 +155,7 @@ export const register = async (
   } catch (error) {
     console.error("Registration error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "REGISTRATION_FAILED",
         message: "Registration failed. Please try again.",
@@ -178,7 +180,7 @@ export const forgotPassword = async (
   } catch (error) {
     console.error("Forgot password error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "FORGOT_PASSWORD_FAILED",
         message: "Failed to send password reset email. Please try again.",
@@ -203,7 +205,7 @@ export const verifyOtp = async (
   } catch (error) {
     console.error("OTP verification error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "OTP_VERIFICATION_FAILED",
         message: "OTP verification failed. Please try again.",
@@ -228,7 +230,7 @@ export const resendOtp = async (
   } catch (error) {
     console.error("Resend OTP error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "RESEND_OTP_FAILED",
         message: "Failed to resend OTP. Please try again.",
@@ -253,7 +255,7 @@ export const resetPassword = async (
   } catch (error) {
     console.error("Reset password error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "RESET_PASSWORD_FAILED",
         message: "Failed to reset password. Please try again.",
@@ -286,7 +288,7 @@ export const refreshToken = async (
     });
 
     // If refresh successful, save new tokens
-    if (response.success && response.data) {
+    if (response.status && response.data) {
       const { accessToken, refreshToken: newRefreshToken } = response.data;
       await setAuthTokens(accessToken, newRefreshToken);
     }
@@ -295,7 +297,7 @@ export const refreshToken = async (
   } catch (error) {
     console.error("Token refresh error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "TOKEN_REFRESH_FAILED",
         message: "Token refresh failed. Please login again.",
@@ -329,7 +331,7 @@ export const logout = async (): Promise<ApiResponse> => {
     await AsyncStorage.setItem("isLoggedIn", "false");
 
     return {
-      success: true,
+      status: true,
       message: "Logged out successfully",
     };
   }
@@ -348,7 +350,7 @@ export const getUserProfile = async (): Promise<ApiResponse<UserProfile>> => {
   } catch (error) {
     console.error("Get user profile error:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "PROFILE_FETCH_FAILED",
         message: "Failed to fetch user profile.",
