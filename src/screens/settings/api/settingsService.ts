@@ -75,20 +75,20 @@ export interface ApiItemDataResponse {
 }
 
 // Default color options for settings
-export const DEFAULT_COLORS = [
-  "#00E5FF", // Electric Blue
-  "#9C6CDA", // Purple
-  "#4ECDC4", // Mint Green
-  "#FF9500", // Orange
-  "#FF4757", // Red
-  "#FF6B9D", // Pink
-  "#FFD93D", // Yellow
-  "#6C5CE7", // Indigo
-  "#00CEC9", // Teal
-  "#FD79A8", // Coral
-  "#00B894", // Lime
-  "#A29BFE", // Violet
-];
+// export const DEFAULT_COLORS = [
+//   "#00E5FF", // Electric Blue
+//   "#9C6CDA", // Purple
+//   "#4ECDC4", // Mint Green
+//   "#FF9500", // Orange
+//   "#FF4757", // Red
+//   "#FF6B9D", // Pink
+//   "#FFD93D", // Yellow
+//   "#6C5CE7", // Indigo
+//   "#00CEC9", // Teal
+//   "#FD79A8", // Coral
+//   "#00B894", // Lime
+//   "#A29BFE", // Violet
+// ];
 
 // Curated icon list (20 icons) for better UX
 export const ICON_OPTIONS = [
@@ -115,33 +115,33 @@ export const ICON_OPTIONS = [
 ];
 
 // Default icons for different categories
-export const DEFAULT_ICONS = {
-  categories: [
-    "list-outline",
-    "briefcase-outline",
-    "fitness-outline",
-    "book-outline",
-    "game-controller-outline",
-    "car-outline",
-    "home-outline",
-    "restaurant-outline",
-  ],
-  skipReasons: [
-    "time-outline",
-    "cloud-outline",
-    "medical-outline",
-    "airplane-outline",
-    "bed-outline",
-    "alert-circle-outline",
-  ],
-  priorities: [
-    "flag-outline",
-    "star-outline",
-    "flash-outline",
-    "trophy-outline",
-    "target-outline",
-  ],
-};
+// export const DEFAULT_ICONS = {
+//   categories: [
+//     "list-outline",
+//     "briefcase-outline",
+//     "fitness-outline",
+//     "book-outline",
+//     "game-controller-outline",
+//     "car-outline",
+//     "home-outline",
+//     "restaurant-outline",
+//   ],
+//   skipReasons: [
+//     "time-outline",
+//     "cloud-outline",
+//     "medical-outline",
+//     "airplane-outline",
+//     "bed-outline",
+//     "alert-circle-outline",
+//   ],
+//   priorities: [
+//     "flag-outline",
+//     "star-outline",
+//     "flash-outline",
+//     "trophy-outline",
+//     "target-outline",
+//   ],
+// };
 
 // Helper function to convert API item to SettingItem
 const convertApiItemToSettingItem = (
