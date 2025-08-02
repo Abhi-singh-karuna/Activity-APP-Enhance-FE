@@ -380,7 +380,7 @@ const LoginScreen = () => {
             </TouchableOpacity>
 
             {/* Demo Credentials */}
-            <View style={styles.demoContainer}>
+            {/* <View style={styles.demoContainer}>
               <LinearGradient
                 colors={["rgba(0, 229, 255, 0.1)", "rgba(156, 108, 218, 0.1)"]}
                 style={styles.demoGradient}
@@ -396,7 +396,7 @@ const LoginScreen = () => {
                   <Text style={styles.demoText}>Password: password123</Text>
                 </View>
               </LinearGradient>
-            </View>
+            </View> */}
 
             {/* Sign Up Link */}
             <View style={styles.signUpContainer}>

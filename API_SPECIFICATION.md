@@ -590,7 +590,6 @@ Authorization: Bearer <access_token>
 {
   "success": true,
   "data": {
-    "fontSizeScale": 1.0,
     "notificationsEnabled": true,
     "darkModeEnabled": true,
     "soundEnabled": true,
@@ -611,7 +610,6 @@ Authorization: Bearer <access_token>
 
 ```json
 {
-  "fontSizeScale": 1.2,
   "notificationsEnabled": true,
   "darkModeEnabled": false,
   "soundEnabled": true,

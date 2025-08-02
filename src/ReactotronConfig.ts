@@ -9,10 +9,11 @@ declare global {
 }
 
 // Create the Reactotron configuration
-const reactotron = Reactotron.setAsyncStorageHandler(AsyncStorage) // AsyncStorage would either come from `react-native` or `@react-native-community/async-storage` depending on where you get it from
+const reactotron = Reactotron.setAsyncStorageHandler(AsyncStorage)
   .configure({
-    name: "TimeTracker App",
-    host: "192.168.29.169", // This should be your local IP address
+    name: "Activity App",
+    host: "localhost", // Use localhost for development
+    port: 9090, // Default Reactotron port
   })
   .useReactNative({
     asyncStorage: false, // there's a reactotron bug with the async storage on Android, so we use setAsyncStorageHandler instead
@@ -24,6 +25,9 @@ const reactotron = Reactotron.setAsyncStorageHandler(AsyncStorage) // AsyncStora
     overlay: false, // just turning off overlay
   })
   .connect();
+
+// Log connection status
+console.log("🔌 Reactotron connecting...");
 
 // Add some helper functions for Reactotron debugging
 // Clear the Reactotron timeline on every app refresh

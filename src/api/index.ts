@@ -34,4 +34,4 @@ export {
   updateSkipDayEntry,
   deleteSkipDayEntry,
 } from "../screens/settings/api";
-export { updateFontSizeScale } from "../screens/settings/api";
+

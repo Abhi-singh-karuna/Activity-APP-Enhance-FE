@@ -14,8 +14,6 @@ const StyledText: React.FC<StyledTextProps> = ({
   children,
   ...props
 }) => {
-  const { fontSizeMultiplier } = useAppContext();
-
   // Base font sizes for different text variants
   const baseFontSizes = {
     title: 24,
@@ -24,8 +22,8 @@ const StyledText: React.FC<StyledTextProps> = ({
     caption: 14,
   };
 
-  // Calculate adjusted font size based on user preference
-  const fontSize = baseFontSizes[variant] * fontSizeMultiplier;
+  // Use fixed font size since font scaling is removed
+  const fontSize = baseFontSizes[variant];
 
   // Calculate line height based on font size for better readability
   const lineHeight = fontSize * 1.5;

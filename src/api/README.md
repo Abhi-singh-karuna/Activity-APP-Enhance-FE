@@ -23,7 +23,6 @@ await api.auth.logout();
 
 // Settings
 const settings = await api.settings.getUserSettings();
-await api.settings.updateFontSizeScale(1.2);
 
 // App initialization
 await api.app.initializeApp();

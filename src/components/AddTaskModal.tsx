@@ -101,7 +101,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const [btnScale] = useState(new Animated.Value(1));
-  const { categories, fontSizeMultiplier } = useAppContext();
+  const { categories } = useAppContext();
 
   const [newTask, setNewTask] = useState<Partial<Task>>({
     title: "",
@@ -211,10 +211,10 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
   };
 
   // Adjust sizing based on font size multiplier
-  const inputHeight = Math.round(50 * fontSizeMultiplier);
-  const buttonHeight = Math.round(44 * fontSizeMultiplier);
-  const iconSize = Math.round(18 * fontSizeMultiplier);
-  const padding = Math.round(15 * fontSizeMultiplier);
+  const inputHeight = 50;
+  const buttonHeight = 44;
+  const iconSize = 18;
+  const padding = 15;
 
   return (
     <Modal

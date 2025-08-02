@@ -435,19 +435,4 @@ export const deleteSkipDayEntry = async (id: string) => {
 };
 
 // Function to update font size scale
-export const updateFontSizeScale = async (fontSizeScale: number) => {
-  try {
-    const response = await apiRequest({
-      method: "PUT",
-      url: "/settings",
-      data: { fontSizeScale },
-    });
-    return response;
-  } catch (error) {
-    console.error("Error updating font size scale:", error);
-    return {
-      success: false,
-      error: "Failed to update font size scale",
-    };
-  }
-};
+

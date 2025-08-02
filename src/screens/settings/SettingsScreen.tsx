@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -13,46 +7,55 @@ import {
   StatusBar,
   ScrollView,
   Alert,
-  Animated,
   Platform,
   TextInput,
   Modal,
   Keyboard,
   TouchableWithoutFeedback,
   ActivityIndicator,
-  LayoutAnimation,
-  UIManager,
   Dimensions,
   RefreshControl,
+  Animated,
 } from "react-native";
-import Slider from "@react-native-community/slider";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+
+import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { RootStackParamList } from "../../navigation";
 import { useAppContext } from "../../context/AppContext";
-import {
-  MIN_FONT_SCALE,
-  MAX_FONT_SCALE,
-  DEFAULT_FONT_SCALE,
-} from "../../context/AppContext";
-import StyledText from "../../components/StyledText";
+import { settingsService } from "./api";
 
-// Enable LayoutAnimation for Android
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// Icon options for the picker
+const ICON_OPTIONS = [
+  { name: "star-outline", label: "Star" },
+  { name: "heart-outline", label: "Heart" },
+  { name: "bookmark-outline", label: "Bookmark" },
+  { name: "flag-outline", label: "Flag" },
+  { name: "checkmark-circle-outline", label: "Check" },
+  { name: "time-outline", label: "Time" },
+  { name: "calendar-outline", label: "Calendar" },
+  { name: "person-outline", label: "Person" },
+  { name: "home-outline", label: "Home" },
+  { name: "work-outline", label: "Work" },
+  { name: "fitness-outline", label: "Fitness" },
+  { name: "school-outline", label: "School" },
+  { name: "car-outline", label: "Car" },
+  { name: "airplane-outline", label: "Travel" },
+  { name: "restaurant-outline", label: "Food" },
+  { name: "game-controller-outline", label: "Gaming" },
+  { name: "musical-notes-outline", label: "Music" },
+  { name: "camera-outline", label: "Camera" },
+  { name: "gift-outline", label: "Gift" },
+  { name: "trophy-outline", label: "Trophy" },
+];
 
 // Get device dimensions
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isSmallDevice = width < 375;
 const isTablet = width >= 768;
 
-// Enhanced responsive scaling
+// Responsive scaling
 const scale = (size: number) => {
   if (isTablet) return size * 1.2;
   if (isSmallDevice) return size * 0.85;
@@ -62,7 +65,7 @@ const scale = (size: number) => {
 // Define the navigation prop type
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Settings">;
 
-// Enhanced theme colors
+// Theme colors
 const ThemeColors = {
   primary: "#00E5FF",
   secondary: "#9C6CDA",
@@ -72,33 +75,25 @@ const ThemeColors = {
   background: "#000000",
   surface: "#121212",
   card: "#1E1E1E",
-  elevated: "#2A2A2A",
   text: "#FFFFFF",
   textSecondary: "#B0B0B0",
   textTertiary: "#808080",
   border: "rgba(255, 255, 255, 0.1)",
-  borderFocus: "rgba(0, 229, 255, 0.5)",
-  overlay: "rgba(0, 0, 0, 0.8)",
 };
 
-// Enhanced gradient configurations
-const GradientConfigs = {
-  primary: ["#00E5FF", "#9C6CDA"] as [string, string],
-  secondary: ["#9C6CDA", "#7B4397"] as [string, string],
-  success: ["#4ECDC4", "#44A08D"] as [string, string],
-  warning: ["#FF9500", "#FFB74D"] as [string, string],
-  danger: ["#FF4757", "#FF6B81"] as [string, string],
-  surface: ["rgba(26, 26, 26, 0.95)", "rgba(42, 42, 42, 0.95)"] as [
-    string,
-    string
-  ],
-  card: ["rgba(30, 30, 30, 0.95)", "rgba(42, 42, 42, 0.95)"] as [
-    string,
-    string
-  ],
-};
+// Color options
+const ColorOptions = [
+  { id: "1", name: "Electric Blue", value: "#00E5FF" },
+  { id: "2", name: "Purple", value: "#9C6CDA" },
+  { id: "3", name: "Mint Green", value: "#4ECDC4" },
+  { id: "4", name: "Orange", value: "#FF9500" },
+  { id: "5", name: "Red", value: "#FF4757" },
+  { id: "6", name: "Pink", value: "#FF6B9D" },
+  { id: "7", name: "Yellow", value: "#FFD93D" },
+  { id: "8", name: "Indigo", value: "#6C5CE7" },
+];
 
-// Enhanced interfaces
+// Interfaces
 interface SettingItem {
   id: string;
   name: string;
@@ -109,43 +104,26 @@ interface SettingItem {
   level?: number;
 }
 
-interface ColorOption {
-  id: string;
-  name: string;
-  value: string;
-  category: string;
-}
-
-// Available color options for customization
-const ColorOptions: ColorOption[] = [
-  { id: "1", name: "Electric Blue", value: "#00E5FF", category: "blue" },
-  { id: "2", name: "Purple", value: "#9C6CDA", category: "purple" },
-  { id: "3", name: "Mint Green", value: "#4ECDC4", category: "green" },
-  { id: "4", name: "Orange", value: "#FF9500", category: "orange" },
-  { id: "5", name: "Red", value: "#FF4757", category: "red" },
-  { id: "6", name: "Pink", value: "#FF6B9D", category: "pink" },
-  { id: "7", name: "Yellow", value: "#FFD93D", category: "yellow" },
-  { id: "8", name: "Indigo", value: "#6C5CE7", category: "indigo" },
-  { id: "9", name: "Teal", value: "#00CEC9", category: "teal" },
-  { id: "10", name: "Coral", value: "#FD79A8", category: "coral" },
-  { id: "11", name: "Lime", value: "#00B894", category: "lime" },
-  { id: "12", name: "Violet", value: "#A29BFE", category: "violet" },
-];
-
 const SettingsScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { fontSizeScale, setFontSizeScale, logout } = useAppContext();
+  const { logout } = useAppContext();
 
-  // Enhanced state management
-  const [isLoading, setIsLoading] = useState(true);
+  // State management
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [sliderValue, setSliderValue] = useState(fontSizeScale);
-  const [textSizePreviewExpanded, setTextSizePreviewExpanded] = useState(false);
-
-  // Settings data
   const [categories, setCategories] = useState<SettingItem[]>([]);
   const [skipReasons, setSkipReasons] = useState<SettingItem[]>([]);
   const [priorities, setPriorities] = useState<SettingItem[]>([]);
+
+  // Section-specific loading states
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [skipReasonsLoading, setSkipReasonsLoading] = useState(false);
+  const [prioritiesLoading, setPrioritiesLoading] = useState(false);
+
+  // Animation refs for section refreshes
+  const categoriesOpacity = useRef(new Animated.Value(1)).current;
+  const skipReasonsOpacity = useRef(new Animated.Value(1)).current;
+  const prioritiesOpacity = useRef(new Animated.Value(1)).current;
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -153,6 +131,8 @@ const SettingsScreen = () => {
   const [editingItem, setEditingItem] = useState<SettingItem | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [selectedColor, setSelectedColor] = useState(ColorOptions[0].value);
+  const [selectedIcon, setSelectedIcon] = useState(ICON_OPTIONS[0].name);
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<
     "categories" | "skipReasons" | "priorities"
   >("categories");
@@ -163,74 +143,132 @@ const SettingsScreen = () => {
     null
   );
 
-  // Enhanced animation refs
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const modalScaleAnim = useRef(new Animated.Value(0.3)).current;
-  const modalOpacityAnim = useRef(new Animated.Value(0)).current;
-  const headerScaleAnim = useRef(new Animated.Value(0.95)).current;
-  const sectionAnimRefs = useRef(
-    Array(6)
-      .fill(0)
-      .map(() => new Animated.Value(0))
-  ).current;
-
-  // Enhanced initialization animations
-  const initializeAnimations = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 80,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.spring(headerScaleAnim, {
-        toValue: 1,
-        tension: 100,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.stagger(
-        100,
-        sectionAnimRefs.map((anim) =>
-          Animated.spring(anim, {
-            toValue: 1,
-            tension: 80,
-            friction: 8,
-            useNativeDriver: true,
-          })
-        )
-      ),
-    ]).start();
-  }, [fadeAnim, slideAnim, headerScaleAnim, sectionAnimRefs]);
-
-  // Load settings from API
+  // Load settings data
   const loadSettings = useCallback(async () => {
     try {
       setIsLoading(true);
-      // TODO: Replace with actual API calls
-      // const [categoriesRes, skipReasonsRes, prioritiesRes] = await Promise.all([
-      //   settingsService.getCategories(),
-      //   settingsService.getSkipReasons(),
-      //   settingsService.getPriorities(),
-      // ]);
 
-      // For now, start with empty arrays until API is implemented
-      setCategories([]);
-      setSkipReasons([]);
-      setPriorities([]);
+      // Load all settings data from API
+      const [categoriesRes, skipReasonsRes, prioritiesRes] = await Promise.all([
+        settingsService.getCategories(),
+        settingsService.getSkipReasons(),
+        settingsService.getPriorities(),
+      ]);
+
+      // Update state with API responses
+      if (categoriesRes.status && categoriesRes.data) {
+        setCategories(categoriesRes.data);
+      }
+
+      if (skipReasonsRes.status && skipReasonsRes.data) {
+        setSkipReasons(skipReasonsRes.data);
+        console.tron?.log(
+          "✅ Skip reasons loaded:",
+          skipReasonsRes.data.length
+        );
+      }
+
+      if (prioritiesRes.status && prioritiesRes.data) {
+        setPriorities(prioritiesRes.data);
+        console.tron?.log("✅ Priorities loaded:", prioritiesRes.data.length);
+      }
+
+      // Add a small delay to make the refresh more noticeable
+      await new Promise((resolve) => setTimeout(resolve, 300));
     } catch (error) {
       console.error("Failed to load settings:", error);
+      console.tron?.log("❌ Error loading settings:", error);
       Alert.alert("Error", "Failed to load settings. Please try again.");
     } finally {
       setIsLoading(false);
+      console.tron?.log("🏁 Settings loading completed");
     }
   }, []);
+
+  // Section-specific refresh functions with animations
+  const refreshCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+
+    // Fade out animation
+    Animated.timing(categoriesOpacity, {
+      toValue: 0.3,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    try {
+      const response = await settingsService.getCategories();
+      if (response.status && response.data) {
+        setCategories(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to refresh categories:", error);
+    } finally {
+      // Fade in animation
+      Animated.timing(categoriesOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setCategoriesLoading(false);
+    }
+  }, [categoriesOpacity]);
+
+  const refreshSkipReasons = useCallback(async () => {
+    setSkipReasonsLoading(true);
+
+    // Fade out animation
+    Animated.timing(skipReasonsOpacity, {
+      toValue: 0.3,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    try {
+      const response = await settingsService.getSkipReasons();
+      if (response.status && response.data) {
+        setSkipReasons(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to refresh skip reasons:", error);
+    } finally {
+      // Fade in animation
+      Animated.timing(skipReasonsOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setSkipReasonsLoading(false);
+    }
+  }, [skipReasonsOpacity]);
+
+  const refreshPriorities = useCallback(async () => {
+    setPrioritiesLoading(true);
+
+    // Fade out animation
+    Animated.timing(prioritiesOpacity, {
+      toValue: 0.3,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    try {
+      const response = await settingsService.getPriorities();
+      if (response.status && response.data) {
+        setPriorities(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to refresh priorities:", error);
+    } finally {
+      // Fade in animation
+      Animated.timing(prioritiesOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setPrioritiesLoading(false);
+    }
+  }, [prioritiesOpacity]);
 
   // Enhanced refresh functionality
   const onRefresh = useCallback(async () => {
@@ -239,38 +277,9 @@ const SettingsScreen = () => {
     setIsRefreshing(false);
   }, [loadSettings]);
 
-  // Focus effect for screen refresh
-  useFocusEffect(
-    useCallback(() => {
-      loadSettings();
-      initializeAnimations();
-    }, [loadSettings, initializeAnimations])
-  );
-
-  // Update local state when context changes
   useEffect(() => {
-    setSliderValue(fontSizeScale);
-  }, [fontSizeScale]);
-
-  // Enhanced helper functions
-  const getFontSizeLabel = useCallback((scale: number): string => {
-    if (scale <= 0.4) return "Extra Small";
-    if (scale <= 0.5) return "Very Small";
-    if (scale <= 0.6) return "Small";
-    if (scale <= 0.7) return "Small-Medium";
-    if (scale <= 0.8) return "Medium-Small";
-    if (scale <= 0.9) return "Medium";
-    if (scale === 1.0) return "Default";
-    if (scale <= 1.1) return "Medium-Large";
-    if (scale <= 1.2) return "Large";
-    if (scale <= 1.4) return "Very Large";
-    if (scale <= 1.6) return "Extra Large";
-    return "Jumbo";
-  }, []);
-
-  const getFontSizePercentage = useCallback((scale: number): string => {
-    return `${Math.round(scale * 100)}%`;
-  }, []);
+    loadSettings();
+  }, [loadSettings]);
 
   // Settings management functions
   const handleAddItem = useCallback(async () => {
@@ -283,7 +292,7 @@ const SettingsScreen = () => {
       const newItem: SettingItem = {
         id: Date.now().toString(),
         name: newItemName.trim(),
-        icon: getIconForCategory(currentCategory),
+        icon: selectedIcon,
         color: selectedColor,
         category: currentCategory,
         priority:
@@ -291,31 +300,58 @@ const SettingsScreen = () => {
         level: currentCategory === "priorities" ? getNextLevel() : undefined,
       };
 
-      // TODO: Replace with actual API call
-      // await settingsService.createItem(currentCategory, newItem);
+      // Create item using API
+      let response;
+      const createData = {
+        name: newItem.name,
+        icon: newItem.icon,
+        color: newItem.color,
+        ...(currentCategory === "priorities" && {
+          priority: newItem.priority,
+          level: newItem.level,
+        }),
+      };
 
-      // Update local state
       switch (currentCategory) {
         case "categories":
-          setCategories((prev) => [...prev, newItem]);
+          response = await settingsService.createCategory(createData);
           break;
         case "skipReasons":
-          setSkipReasons((prev) => [...prev, newItem]);
+          response = await settingsService.createSkipReason(createData);
           break;
         case "priorities":
-          setPriorities((prev) => [...prev, newItem]);
+          response = await settingsService.createPriority(createData);
           break;
       }
 
-      setNewItemName("");
-      setSelectedColor(ColorOptions[0].value);
-      hideModal();
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      if (response.status && response.data) {
+        // Refresh only the specific section
+        switch (currentCategory) {
+          case "categories":
+            await refreshCategories();
+            break;
+          case "skipReasons":
+            await refreshSkipReasons();
+            break;
+          case "priorities":
+            await refreshPriorities();
+            break;
+        }
+
+        setNewItemName("");
+        setSelectedColor(ColorOptions[0].value);
+        setSelectedIcon(ICON_OPTIONS[0].name);
+        setShowAddModal(false);
+
+        Alert.alert("Success", "Item added successfully!");
+      } else {
+        throw new Error(response.error?.message || "Failed to create item");
+      }
     } catch (error) {
       console.error("Failed to add item:", error);
       Alert.alert("Error", "Failed to add item. Please try again.");
     }
-  }, [newItemName, selectedColor, currentCategory]);
+  }, [newItemName, selectedColor, selectedIcon, currentCategory]);
 
   const handleEditItem = useCallback(async () => {
     if (!editingItem || !newItemName.trim()) {
@@ -327,38 +363,64 @@ const SettingsScreen = () => {
       const updatedItem: SettingItem = {
         ...editingItem,
         name: newItemName.trim(),
+        icon: selectedIcon,
         color: selectedColor,
       };
 
-      // TODO: Replace with actual API call
-      // await settingsService.updateItem(currentCategory, updatedItem);
-
-      // Update local state
-      const updateArray = (items: SettingItem[]) =>
-        items.map((item) => (item.id === editingItem.id ? updatedItem : item));
+      // Update item using API
+      let response;
+      const updateData = {
+        id: editingItem.id,
+        name: updatedItem.name,
+        icon: updatedItem.icon,
+        color: updatedItem.color,
+        ...(currentCategory === "priorities" && {
+          priority: updatedItem.priority,
+          level: updatedItem.level,
+        }),
+      };
 
       switch (currentCategory) {
         case "categories":
-          setCategories(updateArray);
+          response = await settingsService.updateCategory(updateData);
           break;
         case "skipReasons":
-          setSkipReasons(updateArray);
+          response = await settingsService.updateSkipReason(updateData);
           break;
         case "priorities":
-          setPriorities(updateArray);
+          response = await settingsService.updatePriority(updateData);
           break;
       }
 
-      setEditingItem(null);
-      setNewItemName("");
-      setSelectedColor(ColorOptions[0].value);
-      hideModal();
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      if (response.status && response.data) {
+        // Refresh only the specific section
+        switch (currentCategory) {
+          case "categories":
+            await refreshCategories();
+            break;
+          case "skipReasons":
+            await refreshSkipReasons();
+            break;
+          case "priorities":
+            await refreshPriorities();
+            break;
+        }
+
+        setEditingItem(null);
+        setNewItemName("");
+        setSelectedColor(ColorOptions[0].value);
+        setSelectedIcon(ICON_OPTIONS[0].name);
+        setShowAddModal(false);
+
+        Alert.alert("Success", "Item updated successfully!");
+      } else {
+        throw new Error(response.error?.message || "Failed to update item");
+      }
     } catch (error) {
       console.error("Failed to edit item:", error);
       Alert.alert("Error", "Failed to edit item. Please try again.");
     }
-  }, [editingItem, newItemName, selectedColor, currentCategory]);
+  }, [editingItem, newItemName, selectedColor, selectedIcon, currentCategory]);
 
   const handleDeleteItem = useCallback(async (item: SettingItem) => {
     Alert.alert(
@@ -371,28 +433,39 @@ const SettingsScreen = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              // TODO: Replace with actual API call
-              // await settingsService.deleteItem(item.category, item.id);
-
-              // Update local state
-              const filterArray = (items: SettingItem[]) =>
-                items.filter((i) => i.id !== item.id);
-
+              // Delete item using API
+              let response;
               switch (item.category) {
                 case "categories":
-                  setCategories(filterArray);
+                  response = await settingsService.deleteCategory(item.id);
                   break;
                 case "skipReasons":
-                  setSkipReasons(filterArray);
+                  response = await settingsService.deleteSkipReason(item.id);
                   break;
                 case "priorities":
-                  setPriorities(filterArray);
+                  response = await settingsService.deletePriority(item.id);
                   break;
               }
 
-              LayoutAnimation.configureNext(
-                LayoutAnimation.Presets.easeInEaseOut
-              );
+              if (response.status) {
+                // Refresh only the specific section
+                switch (item.category) {
+                  case "categories":
+                    await refreshCategories();
+                    break;
+                  case "skipReasons":
+                    await refreshSkipReasons();
+                    break;
+                  case "priorities":
+                    await refreshPriorities();
+                    break;
+                }
+                Alert.alert("Success", "Item deleted successfully!");
+              } else {
+                throw new Error(
+                  response.error?.message || "Failed to delete item"
+                );
+              }
             } catch (error) {
               console.error("Failed to delete item:", error);
               Alert.alert("Error", "Failed to delete item. Please try again.");
@@ -404,22 +477,6 @@ const SettingsScreen = () => {
   }, []);
 
   // Helper functions
-  const getIconForCategory = useCallback(
-    (category: "categories" | "skipReasons" | "priorities"): string => {
-      switch (category) {
-        case "categories":
-          return "list-outline";
-        case "skipReasons":
-          return "time-outline";
-        case "priorities":
-          return "flag-outline";
-        default:
-          return "settings-outline";
-      }
-    },
-    []
-  );
-
   const getNextPriority = useCallback((): number => {
     return priorities.length > 0
       ? Math.max(...priorities.map((p) => p.priority || 0)) + 1
@@ -443,49 +500,26 @@ const SettingsScreen = () => {
         setEditingItem(item);
         setNewItemName(item.name);
         setSelectedColor(item.color);
+        setSelectedIcon(item.icon);
       } else {
         setEditingItem(null);
         setNewItemName("");
         setSelectedColor(ColorOptions[0].value);
+        setSelectedIcon(ICON_OPTIONS[0].name);
       }
       setShowAddModal(true);
-
-      Animated.parallel([
-        Animated.spring(modalScaleAnim, {
-          toValue: 1,
-          tension: 100,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-        Animated.timing(modalOpacityAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
     },
     []
   );
 
   const hideModal = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(modalScaleAnim, {
-        toValue: 0.3,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(modalOpacityAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowAddModal(false);
-      setShowColorPicker(false);
-      setEditingItem(null);
-      setNewItemName("");
-      setSelectedColor(ColorOptions[0].value);
-    });
+    setShowAddModal(false);
+    setShowColorPicker(false);
+    setShowIconPicker(false);
+    setEditingItem(null);
+    setNewItemName("");
+    setSelectedColor(ColorOptions[0].value);
+    setSelectedIcon(ICON_OPTIONS[0].name);
   }, []);
 
   // Account management
@@ -536,19 +570,28 @@ const SettingsScreen = () => {
 
     try {
       if (pendingAction === "clear") {
-        // TODO: Replace with actual API call
-        // await settingsService.clearAllData();
-        setCategories([]);
-        setSkipReasons([]);
-        setPriorities([]);
-        setFontSizeScale(DEFAULT_FONT_SCALE);
-        Alert.alert("Success", "All data has been cleared.");
+        // Clear all data using API
+        const response = await settingsService.clearAllSettings();
+        if (response.status) {
+          setCategories([]);
+          setSkipReasons([]);
+          setPriorities([]);
+          Alert.alert("Success", "All data has been cleared.");
+        } else {
+          throw new Error(response.error?.message || "Failed to clear data");
+        }
       } else if (pendingAction === "delete") {
-        // TODO: Replace with actual API call
-        // await authService.deleteAccount();
-        logout();
-        navigation.navigate("Login");
-        Alert.alert("Account Deleted", "Your account has been deleted.");
+        // Delete account using API
+        const response = await settingsService.deleteAccount();
+        if (response.status) {
+          logout();
+          navigation.navigate("Login");
+          Alert.alert("Account Deleted", "Your account has been deleted.");
+        } else {
+          throw new Error(
+            response.error?.message || "Failed to delete account"
+          );
+        }
       }
 
       setPassword("");
@@ -559,7 +602,7 @@ const SettingsScreen = () => {
       console.error("Failed to perform action:", error);
       Alert.alert("Error", "Failed to perform action. Please try again.");
     }
-  }, [password, pendingAction, logout, navigation, setFontSizeScale]);
+  }, [password, pendingAction, logout, navigation]);
 
   const handleLogout = useCallback(() => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -583,25 +626,9 @@ const SettingsScreen = () => {
   // Render helper functions
   const renderSettingItem = useCallback(
     (item: SettingItem, index: number) => (
-      <Animated.View
-        key={item.id}
-        style={[
-          styles.settingItem,
-          {
-            opacity: fadeAnim,
-            transform: [
-              {
-                translateY: slideAnim.interpolate({
-                  inputRange: [0, 50],
-                  outputRange: [0, 30],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
+      <View key={item.id} style={styles.settingItem}>
         <LinearGradient
-          colors={GradientConfigs.card}
+          colors={["rgba(30, 30, 30, 0.95)", "rgba(42, 42, 42, 0.95)"]}
           style={styles.settingItemGradient}
         >
           <View style={styles.settingItemLeft}>
@@ -650,9 +677,9 @@ const SettingsScreen = () => {
             </TouchableOpacity>
           </View>
         </LinearGradient>
-      </Animated.View>
+      </View>
     ),
-    [fadeAnim, slideAnim, showModal, handleDeleteItem]
+    [showModal, handleDeleteItem]
   );
 
   const renderColorPicker = useCallback(
@@ -660,7 +687,7 @@ const SettingsScreen = () => {
       <View style={styles.colorPickerContainer}>
         <Text style={styles.colorPickerTitle}>Choose a Color</Text>
         <View style={styles.colorGrid}>
-          {ColorOptions.map((color, index) => (
+          {ColorOptions.map((color) => (
             <TouchableOpacity
               key={color.id}
               style={[
@@ -689,6 +716,52 @@ const SettingsScreen = () => {
     [selectedColor]
   );
 
+  const renderIconPicker = useCallback(
+    () => (
+      <View style={styles.iconPickerContainer}>
+        <Text style={styles.iconPickerTitle}>Choose an Icon</Text>
+        <View style={styles.iconGrid}>
+          {ICON_OPTIONS.map(
+            (icon: { name: string; label: string }, index: number) => (
+              <TouchableOpacity
+                key={icon.name}
+                style={[
+                  styles.iconOption,
+                  {
+                    borderWidth: selectedIcon === icon.name ? 3 : 0,
+                    borderColor: ThemeColors.primary,
+                    transform: [
+                      {
+                        scale: selectedIcon === icon.name ? 1.1 : 1,
+                      },
+                    ],
+                  },
+                ]}
+                onPress={() => setSelectedIcon(icon.name)}
+              >
+                <Icon
+                  name={icon.name}
+                  size={scale(24)}
+                  color={
+                    selectedIcon === icon.name
+                      ? ThemeColors.primary
+                      : ThemeColors.text
+                  }
+                />
+                {selectedIcon === icon.name && (
+                  <View style={styles.iconCheckmark}>
+                    <Icon name="checkmark" size={scale(12)} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            )
+          )}
+        </View>
+      </View>
+    ),
+    [selectedIcon]
+  );
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -705,16 +778,8 @@ const SettingsScreen = () => {
         backgroundColor={ThemeColors.background}
       />
 
-      {/* Enhanced Header */}
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }, { scale: headerScaleAnim }],
-          },
-        ]}
-      >
+      {/* Header */}
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -734,7 +799,7 @@ const SettingsScreen = () => {
           <Text style={styles.headerTitle}>Settings</Text>
           <Text style={styles.headerSubtitle}>Customize your experience</Text>
         </View>
-      </Animated.View>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -749,129 +814,10 @@ const SettingsScreen = () => {
           />
         }
       >
-        {/* Text Size Section */}
-        <Animated.View
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: sectionAnimRefs[0] }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={GradientConfigs.surface}
-            style={styles.sectionGradient}
-          >
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <View
-                  style={[
-                    styles.sectionIcon,
-                    { backgroundColor: ThemeColors.primary },
-                  ]}
-                >
-                  <Icon name="text-outline" size={scale(20)} color="#fff" />
-                </View>
-                <View>
-                  <Text style={styles.sectionTitle}>Text Size</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    Adjust app text size
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.expandButton}
-                onPress={() =>
-                  setTextSizePreviewExpanded(!textSizePreviewExpanded)
-                }
-              >
-                <Icon
-                  name={textSizePreviewExpanded ? "chevron-up" : "chevron-down"}
-                  size={scale(20)}
-                  color={ThemeColors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.sliderContainer}>
-              <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabel}>A</Text>
-                <Text style={styles.sliderValueText}>
-                  {getFontSizeLabel(sliderValue)} (
-                  {getFontSizePercentage(sliderValue)})
-                </Text>
-                <Text style={[styles.sliderLabel, styles.sliderLabelLarge]}>
-                  A
-                </Text>
-              </View>
-
-              <Slider
-                style={styles.slider}
-                value={sliderValue}
-                minimumValue={MIN_FONT_SCALE}
-                maximumValue={MAX_FONT_SCALE}
-                step={0.1}
-                minimumTrackTintColor={ThemeColors.primary}
-                maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-                thumbTintColor={ThemeColors.primary}
-                onValueChange={setSliderValue}
-                onSlidingComplete={setFontSizeScale}
-              />
-
-              <TouchableOpacity
-                style={styles.resetButton}
-                onPress={() => {
-                  setSliderValue(DEFAULT_FONT_SCALE);
-                  setFontSizeScale(DEFAULT_FONT_SCALE);
-                }}
-              >
-                <LinearGradient
-                  colors={["rgba(0, 229, 255, 0.2)", "rgba(0, 229, 255, 0.1)"]}
-                  style={styles.resetButtonGradient}
-                >
-                  <Text style={styles.resetButtonText}>Reset to Default</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-
-            {textSizePreviewExpanded && (
-              <View style={styles.textPreviewContainer}>
-                <LinearGradient
-                  colors={["rgba(0, 0, 0, 0.3)", "rgba(0, 0, 0, 0.5)"]}
-                  style={styles.textPreviewGradient}
-                >
-                  <StyledText variant="title" style={styles.previewTitle}>
-                    Sample Title Text
-                  </StyledText>
-                  <StyledText variant="subtitle" style={styles.previewSubtitle}>
-                    Sample Subtitle Text
-                  </StyledText>
-                  <StyledText variant="body" style={styles.previewBody}>
-                    This is how your text will appear throughout the app with
-                    the current size setting.
-                  </StyledText>
-                  <StyledText variant="caption" style={styles.previewCaption}>
-                    Sample caption text for additional information.
-                  </StyledText>
-                </LinearGradient>
-              </View>
-            )}
-          </LinearGradient>
-        </Animated.View>
-
         {/* Categories Section */}
-        <Animated.View
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: sectionAnimRefs[1] }],
-            },
-          ]}
-        >
+        <Animated.View style={[styles.section, { opacity: categoriesOpacity }]}>
           <LinearGradient
-            colors={GradientConfigs.surface}
+            colors={["rgba(26, 26, 26, 0.95)", "rgba(42, 42, 42, 0.95)"]}
             style={styles.sectionGradient}
           >
             <View style={styles.sectionHeader}>
@@ -885,7 +831,12 @@ const SettingsScreen = () => {
                   <Icon name="list-outline" size={scale(20)} color="#fff" />
                 </View>
                 <View>
-                  <Text style={styles.sectionTitle}>Activity Categories</Text>
+                  <Text style={styles.sectionTitle}>
+                    Activity Categories
+                    {categoriesLoading && (
+                      <Text style={styles.loadingIndicator}> 🔄</Text>
+                    )}
+                  </Text>
                   <Text style={styles.sectionSubtitle}>
                     Manage activity categories
                   </Text>
@@ -896,7 +847,7 @@ const SettingsScreen = () => {
                 onPress={() => showModal("categories")}
               >
                 <LinearGradient
-                  colors={GradientConfigs.secondary}
+                  colors={["#9C6CDA", "#7B4397"]}
                   style={styles.addButtonGradient}
                 >
                   <Icon name="add" size={scale(20)} color="#fff" />
@@ -931,16 +882,10 @@ const SettingsScreen = () => {
 
         {/* Skip Reasons Section */}
         <Animated.View
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: sectionAnimRefs[2] }],
-            },
-          ]}
+          style={[styles.section, { opacity: skipReasonsOpacity }]}
         >
           <LinearGradient
-            colors={GradientConfigs.surface}
+            colors={["rgba(26, 26, 26, 0.95)", "rgba(42, 42, 42, 0.95)"]}
             style={styles.sectionGradient}
           >
             <View style={styles.sectionHeader}>
@@ -954,7 +899,12 @@ const SettingsScreen = () => {
                   <Icon name="time-outline" size={scale(20)} color="#fff" />
                 </View>
                 <View>
-                  <Text style={styles.sectionTitle}>Skip Reasons</Text>
+                  <Text style={styles.sectionTitle}>
+                    Skip Reasons
+                    {skipReasonsLoading && (
+                      <Text style={styles.loadingIndicator}> 🔄</Text>
+                    )}
+                  </Text>
                   <Text style={styles.sectionSubtitle}>
                     Reasons for skipping activities
                   </Text>
@@ -965,7 +915,7 @@ const SettingsScreen = () => {
                 onPress={() => showModal("skipReasons")}
               >
                 <LinearGradient
-                  colors={GradientConfigs.warning}
+                  colors={["#FF9500", "#FFB74D"]}
                   style={styles.addButtonGradient}
                 >
                   <Icon name="add" size={scale(20)} color="#fff" />
@@ -997,17 +947,9 @@ const SettingsScreen = () => {
         </Animated.View>
 
         {/* Priority Levels Section */}
-        <Animated.View
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: sectionAnimRefs[3] }],
-            },
-          ]}
-        >
+        <Animated.View style={[styles.section, { opacity: prioritiesOpacity }]}>
           <LinearGradient
-            colors={GradientConfigs.surface}
+            colors={["rgba(26, 26, 26, 0.95)", "rgba(42, 42, 42, 0.95)"]}
             style={styles.sectionGradient}
           >
             <View style={styles.sectionHeader}>
@@ -1021,7 +963,12 @@ const SettingsScreen = () => {
                   <Icon name="flag-outline" size={scale(20)} color="#fff" />
                 </View>
                 <View>
-                  <Text style={styles.sectionTitle}>Priority Levels</Text>
+                  <Text style={styles.sectionTitle}>
+                    Priority Levels
+                    {prioritiesLoading && (
+                      <Text style={styles.loadingIndicator}> 🔄</Text>
+                    )}
+                  </Text>
                   <Text style={styles.sectionSubtitle}>
                     Task priority configuration
                   </Text>
@@ -1032,7 +979,7 @@ const SettingsScreen = () => {
                 onPress={() => showModal("priorities")}
               >
                 <LinearGradient
-                  colors={GradientConfigs.success}
+                  colors={["#4ECDC4", "#44A08D"]}
                   style={styles.addButtonGradient}
                 >
                   <Icon name="add" size={scale(20)} color="#fff" />
@@ -1068,17 +1015,9 @@ const SettingsScreen = () => {
         </Animated.View>
 
         {/* Account Section */}
-        <Animated.View
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: sectionAnimRefs[4] }],
-            },
-          ]}
-        >
+        <View style={styles.section}>
           <LinearGradient
-            colors={GradientConfigs.surface}
+            colors={["rgba(26, 26, 26, 0.95)", "rgba(42, 42, 42, 0.95)"]}
             style={styles.sectionGradient}
           >
             <View style={styles.sectionHeader}>
@@ -1104,7 +1043,7 @@ const SettingsScreen = () => {
                 onPress={handleLogout}
               >
                 <LinearGradient
-                  colors={GradientConfigs.primary}
+                  colors={["#00E5FF", "#9C6CDA"]}
                   style={styles.logoutButtonGradient}
                 >
                   <Icon name="log-out-outline" size={scale(20)} color="#fff" />
@@ -1113,18 +1052,10 @@ const SettingsScreen = () => {
               </TouchableOpacity>
             </View>
           </LinearGradient>
-        </Animated.View>
+        </View>
 
         {/* Danger Zone Section */}
-        <Animated.View
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: sectionAnimRefs[5] }],
-            },
-          ]}
-        >
+        <View style={styles.section}>
           <LinearGradient
             colors={["rgba(255, 71, 87, 0.1)", "rgba(255, 71, 87, 0.05)"]}
             style={[styles.sectionGradient, styles.dangerZone]}
@@ -1202,55 +1133,22 @@ const SettingsScreen = () => {
               </TouchableOpacity>
             </View>
           </LinearGradient>
-        </Animated.View>
-
-        {/* App Info Section */}
-        <Animated.View
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: sectionAnimRefs[5] }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={GradientConfigs.surface}
-            style={styles.sectionGradient}
-          >
-            <View style={styles.appInfo}>
-              <Icon
-                name="information-circle-outline"
-                size={scale(24)}
-                color={ThemeColors.primary}
-              />
-              <Text style={styles.appInfoText}>Activity Manager v1.0.0</Text>
-            </View>
-          </LinearGradient>
-        </Animated.View>
+        </View>
       </ScrollView>
 
       {/* Add/Edit Modal */}
       <Modal
         visible={showAddModal}
         transparent={true}
-        animationType="none"
+        animationType="fade"
         onRequestClose={hideModal}
       >
         <TouchableWithoutFeedback onPress={hideModal}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <Animated.View
-                style={[
-                  styles.modalContainer,
-                  {
-                    transform: [{ scale: modalScaleAnim }],
-                    opacity: modalOpacityAnim,
-                  },
-                ]}
-              >
+              <View style={styles.modalContainer}>
                 <LinearGradient
-                  colors={GradientConfigs.card}
+                  colors={["rgba(30, 30, 30, 0.95)", "rgba(42, 42, 42, 0.95)"]}
                   style={styles.modalGradient}
                 >
                   <Text style={styles.modalTitle}>
@@ -1305,6 +1203,32 @@ const SettingsScreen = () => {
 
                   {showColorPicker && renderColorPicker()}
 
+                  <View style={styles.modalInputContainer}>
+                    <Text style={styles.inputLabel}>Icon</Text>
+                    <TouchableOpacity
+                      style={styles.iconPickerButton}
+                      onPress={() => setShowIconPicker(!showIconPicker)}
+                    >
+                      <View style={styles.selectedIconPreview}>
+                        <Icon
+                          name={selectedIcon}
+                          size={scale(20)}
+                          color={ThemeColors.text}
+                        />
+                      </View>
+                      <Text style={styles.iconPickerButtonText}>
+                        Select Icon
+                      </Text>
+                      <Icon
+                        name="chevron-down"
+                        size={scale(16)}
+                        color={ThemeColors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {showIconPicker && renderIconPicker()}
+
                   <View style={styles.modalActions}>
                     <TouchableOpacity
                       style={styles.modalButton}
@@ -1325,7 +1249,7 @@ const SettingsScreen = () => {
                       onPress={editingItem ? handleEditItem : handleAddItem}
                     >
                       <LinearGradient
-                        colors={GradientConfigs.primary}
+                        colors={["#00E5FF", "#9C6CDA"]}
                         style={styles.modalButtonGradient}
                       >
                         <Text style={styles.modalButtonText}>
@@ -1335,7 +1259,7 @@ const SettingsScreen = () => {
                     </TouchableOpacity>
                   </View>
                 </LinearGradient>
-              </Animated.View>
+              </View>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
@@ -1345,23 +1269,15 @@ const SettingsScreen = () => {
       <Modal
         visible={showPasswordModal}
         transparent={true}
-        animationType="none"
+        animationType="fade"
         onRequestClose={() => setShowPasswordModal(false)}
       >
         <TouchableWithoutFeedback onPress={() => setShowPasswordModal(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <Animated.View
-                style={[
-                  styles.modalContainer,
-                  {
-                    transform: [{ scale: modalScaleAnim }],
-                    opacity: modalOpacityAnim,
-                  },
-                ]}
-              >
+              <View style={styles.modalContainer}>
                 <LinearGradient
-                  colors={GradientConfigs.card}
+                  colors={["rgba(30, 30, 30, 0.95)", "rgba(42, 42, 42, 0.95)"]}
                   style={styles.modalGradient}
                 >
                   <Icon
@@ -1420,7 +1336,7 @@ const SettingsScreen = () => {
                       disabled={!password.trim()}
                     >
                       <LinearGradient
-                        colors={GradientConfigs.danger}
+                        colors={["#FF4757", "#FF6B81"]}
                         style={[
                           styles.modalButtonGradient,
                           !password.trim() && styles.disabledButton,
@@ -1431,7 +1347,7 @@ const SettingsScreen = () => {
                     </TouchableOpacity>
                   </View>
                 </LinearGradient>
-              </Animated.View>
+              </View>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
@@ -1456,8 +1372,6 @@ const styles = StyleSheet.create({
     marginTop: scale(16),
     fontSize: scale(16),
   },
-
-  // Enhanced Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1493,8 +1407,6 @@ const styles = StyleSheet.create({
     fontSize: scale(14),
     marginTop: scale(2),
   },
-
-  // Scroll View
   scrollView: {
     flex: 1,
   },
@@ -1502,8 +1414,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(20),
     paddingBottom: scale(30),
   },
-
-  // Enhanced Sections
   section: {
     marginBottom: scale(20),
     borderRadius: scale(20),
@@ -1548,9 +1458,6 @@ const styles = StyleSheet.create({
     color: ThemeColors.textSecondary,
     fontSize: scale(12),
   },
-  expandButton: {
-    padding: scale(8),
-  },
   addButton: {
     width: scale(36),
     height: scale(36),
@@ -1562,82 +1469,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  // Slider Container
-  sliderContainer: {
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    borderRadius: scale(16),
-    padding: scale(16),
-    marginBottom: scale(16),
-  },
-  sliderLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: scale(12),
-  },
-  sliderLabel: {
-    color: ThemeColors.textSecondary,
-    fontSize: scale(16),
-    fontWeight: "600",
-  },
-  sliderLabelLarge: {
-    fontSize: scale(24),
-  },
-  sliderValueText: {
-    color: ThemeColors.primary,
-    fontSize: scale(14),
-    fontWeight: "700",
-  },
-  slider: {
-    width: "100%",
-    height: scale(40),
-    marginBottom: scale(12),
-  },
-  resetButton: {
-    borderRadius: scale(12),
-    overflow: "hidden",
-    alignSelf: "center",
-  },
-  resetButtonGradient: {
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(10),
-    borderWidth: 1,
-    borderColor: "rgba(0, 229, 255, 0.3)",
-  },
-  resetButtonText: {
-    color: ThemeColors.primary,
-    fontSize: scale(14),
-    fontWeight: "600",
-  },
-
-  // Text Preview
-  textPreviewContainer: {
-    borderRadius: scale(12),
-    overflow: "hidden",
-    marginTop: scale(12),
-  },
-  textPreviewGradient: {
-    padding: scale(16),
-  },
-  previewTitle: {
-    color: ThemeColors.text,
-    marginBottom: scale(8),
-  },
-  previewSubtitle: {
-    color: ThemeColors.textSecondary,
-    marginBottom: scale(8),
-  },
-  previewBody: {
-    color: ThemeColors.textSecondary,
-    marginBottom: scale(8),
-    lineHeight: scale(20),
-  },
-  previewCaption: {
-    color: ThemeColors.textTertiary,
-  },
-
-  // Settings List
   settingsList: {
     gap: scale(12),
   },
@@ -1701,8 +1532,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
-
-  // Empty State
   emptyState: {
     alignItems: "center",
     paddingVertical: scale(32),
@@ -1726,8 +1555,6 @@ const styles = StyleSheet.create({
     fontSize: scale(14),
     fontWeight: "600",
   },
-
-  // Account Actions
   accountActions: {
     gap: scale(12),
   },
@@ -1773,25 +1600,9 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     fontWeight: "600",
   },
-
-  // App Info
-  appInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: scale(12),
-    gap: scale(8),
-  },
-  appInfoText: {
-    color: ThemeColors.textSecondary,
-    fontSize: scale(14),
-    fontWeight: "500",
-  },
-
-  // Enhanced Modals
   modalOverlay: {
     flex: 1,
-    backgroundColor: ThemeColors.overlay,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
     justifyContent: "center",
     alignItems: "center",
     padding: scale(20),
@@ -1837,22 +1648,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: ThemeColors.border,
   },
-  inputError: {
-    borderColor: ThemeColors.danger,
-  },
-  errorText: {
-    color: ThemeColors.danger,
-    fontSize: scale(12),
-    marginTop: scale(4),
-  },
-  passwordDescription: {
-    color: ThemeColors.textSecondary,
-    fontSize: scale(14),
-    textAlign: "center",
-    marginBottom: scale(20),
-  },
-
-  // Color Picker
   colorPickerContainer: {
     marginBottom: scale(16),
   },
@@ -1902,8 +1697,71 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-
-  // Modal Actions
+  iconPickerContainer: {
+    marginBottom: scale(16),
+  },
+  iconPickerTitle: {
+    color: ThemeColors.textSecondary,
+    fontSize: scale(14),
+    fontWeight: "600",
+    marginBottom: scale(12),
+  },
+  iconPickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: scale(12),
+    padding: scale(16),
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+    gap: scale(12),
+  },
+  selectedIconPreview: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  iconPickerButtonText: {
+    color: ThemeColors.text,
+    fontSize: scale(16),
+    flex: 1,
+  },
+  iconGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: scale(12),
+    justifyContent: "space-between",
+  },
+  iconOption: {
+    width: scale(48),
+    height: scale(48),
+    borderRadius: scale(24),
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    position: "relative",
+  },
+  iconCheckmark: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: scale(16),
+    height: scale(16),
+    borderRadius: scale(8),
+    backgroundColor: ThemeColors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   modalActions: {
     flexDirection: "row",
     gap: scale(12),
@@ -1924,8 +1782,26 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     fontWeight: "600",
   },
+  inputError: {
+    borderColor: ThemeColors.danger,
+  },
+  errorText: {
+    color: ThemeColors.danger,
+    fontSize: scale(12),
+    marginTop: scale(4),
+  },
+  passwordDescription: {
+    color: ThemeColors.textSecondary,
+    fontSize: scale(14),
+    textAlign: "center",
+    marginBottom: scale(20),
+  },
   disabledButton: {
     opacity: 0.5,
+  },
+  loadingIndicator: {
+    color: ThemeColors.primary,
+    fontSize: scale(14),
   },
 });
 
