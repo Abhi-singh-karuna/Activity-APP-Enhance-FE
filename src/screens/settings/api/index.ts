@@ -22,6 +22,7 @@ export {
   updatePriority,
   deletePriority,
   getUserInfo,
+  verifyPassword,
   clearAllSettings,
   deleteAccount,
 } from "./settingsService";
@@ -36,4 +37,5 @@ export type {
   UserInfo,
   ClearDataRequest,
   DeleteAccountRequest,
+  VerifyPasswordRequest,
 } from "./settingsService";

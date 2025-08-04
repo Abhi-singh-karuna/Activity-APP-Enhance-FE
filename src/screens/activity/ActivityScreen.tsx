@@ -22,6 +22,7 @@ import {
   RefreshControl,
   LayoutAnimation,
   UIManager,
+  ScrollView,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -33,15 +34,13 @@ import AddActivityModal from "../../components/AddActivityModal";
 import StyledText from "../../components/StyledText";
 import { useAppContext } from "../../context/AppContext";
 
-// Get device dimensions and setup responsive design
+// Get device dimensions
 const { width, height } = Dimensions.get("window");
 const isSmallDevice = width < 375;
-const isTablet = width >= 768;
 
-// Enhanced responsive scaling with device type consideration
+// Responsive scaling
 const scale = (size: number) => {
-  if (isTablet) return size * 1.2;
-  if (isSmallDevice) return size * 0.85;
+  if (isSmallDevice) return size * 0.9;
   return size;
 };
 
@@ -79,7 +78,7 @@ const AnimationConfig = {
   friction: 8,
 };
 
-// Theme colors for dynamic theming
+// Theme colors matching auth screens
 const ThemeColors = {
   primary: "#00E5FF",
   secondary: "#9C6CDA",
@@ -87,33 +86,54 @@ const ThemeColors = {
   warning: "#FF9500",
   danger: "#FF4757",
   background: "#000000",
-  surface: "#1A1A1A",
-  card: "#2A2A2A",
+  surface: "#121212",
+  card: "#1E1E1E",
+  cardSecondary: "#2C2C2E",
   text: "#FFFFFF",
-  textSecondary: "#AAAAAA",
+  textSecondary: "#B0B0B0",
+  textTertiary: "#808080",
+  textMuted: "#666666",
   border: "rgba(255, 255, 255, 0.1)",
+  overlay: "rgba(0, 0, 0, 0.8)",
 };
 
-// Enhanced gradient configurations
+// Card background colors based on activity color and state
+const getCardBackground = (activity: EnhancedActivity): [string, string] => {
+  if (activity.isCompleted) {
+    return ["#2D5A27", "#1A3318"]; // Green gradient for completed
+  }
+
+  if (activity.isRunning) {
+    // Use activity's own color when running
+    const baseColor = activity.color || "#00E5FF";
+    // Create a darker gradient from the activity color
+    return [baseColor + "20", baseColor + "10"]; // 20% and 10% opacity
+  } else {
+    // Use gray/black when inactive
+    return ["#1A1A1A", "#0A0A0A"]; // Dark gray/black gradient
+  }
+};
+
+// Gradient configurations matching auth screens
 const GradientConfigs = {
-  running: ["#00E5FF", "#4ECDC4"] as [string, string],
-  paused: ["#FF9500", "#FFB74D"] as [string, string],
-  completed: ["#4ECDC4", "#44A08D"] as [string, string],
-  future: ["rgba(255, 255, 255, 0.1)", "rgba(255, 255, 255, 0.05)"] as [
+  running: ["#00E5FF", "#9C6CDA"] as [string, string],
+  paused: ["#FF9500", "#FF4757"] as [string, string],
+  completed: ["#4ECDC4", "#00E5FF"] as [string, string],
+  future: ["rgba(255, 255, 255, 0.05)", "rgba(255, 255, 255, 0.02)"] as [
     string,
     string
   ],
-  default: ["#1A1A1A", "#2A2A2A"] as [string, string],
-  danger: ["#FF6B6B", "#FF8E53"] as [string, string],
+  default: ["#1E1E1E", "#2C2C2E"] as [string, string],
+  danger: ["#FF4757", "#FF6B9D"] as [string, string],
   primary: ["#00E5FF", "#9C6CDA"] as [string, string],
+  stats: ["#121212", "#1E1E1E"] as [string, string],
+  header: ["#000000", "#121212"] as [string, string],
 };
 
 const ActivityScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { fontSizeMultiplier, logout } = useAppContext();
 
-  // Enhanced state management
-  const [activeTab, setActiveTab] = useState("ACTIVITY");
+  // State management
   const [activities, setActivities] = useState<EnhancedActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -132,7 +152,7 @@ const ActivityScreen = () => {
 
   // Enhanced animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const deleteScaleAnim = useRef(new Animated.Value(0)).current;
   const deleteOpacityAnim = useRef(new Animated.Value(0)).current;
@@ -141,13 +161,13 @@ const ActivityScreen = () => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const timerGlowAnim = useRef(new Animated.Value(0)).current;
   const headerScaleAnim = useRef(new Animated.Value(0.95)).current;
-  const tabSlideAnim = useRef(new Animated.Value(-width)).current;
-  const statsCardAnim = useRef(new Animated.Value(0)).current;
+  const fabScaleAnim = useRef(new Animated.Value(0)).current;
+  const statsSlideAnim = useRef(new Animated.Value(-50)).current;
 
   const deleteMode = useRef(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Enhanced helper functions
+  // Helper functions
   const formatDate = useCallback((date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -180,28 +200,12 @@ const ActivityScreen = () => {
     []
   );
 
-  // Enhanced gradient colors with more sophisticated logic
-  const getGradientColors = useCallback(
-    (activity: EnhancedActivity): [string, string] => {
-      if (activity.isCompleted) return GradientConfigs.completed;
-      if (activity.isPaused) return GradientConfigs.paused;
-      if (isActivityInFuture(activity)) return GradientConfigs.future;
-      if (activity.isRunning) {
-        // Dynamic gradients based on activity properties
-        const baseGradient = GradientConfigs.running;
-        return baseGradient;
-      }
-      return GradientConfigs.default;
-    },
-    [isActivityInFuture]
-  );
-
   // Enhanced initialization animations
   const initializeAnimations = useCallback(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 1000,
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
@@ -216,17 +220,18 @@ const ActivityScreen = () => {
         friction: 8,
         useNativeDriver: true,
       }),
-      Animated.timing(tabSlideAnim, {
+      Animated.spring(statsSlideAnim, {
         toValue: 0,
-        duration: 600,
+        tension: 80,
+        friction: 8,
         delay: 200,
         useNativeDriver: true,
       }),
-      Animated.spring(statsCardAnim, {
+      Animated.spring(fabScaleAnim, {
         toValue: 1,
-        tension: 80,
+        tension: 100,
         friction: 8,
-        delay: 400,
+        delay: 600,
         useNativeDriver: true,
       }),
     ]).start();
@@ -236,27 +241,184 @@ const ActivityScreen = () => {
       Animated.sequence([
         Animated.timing(timerGlowAnim, {
           toValue: 1,
-          duration: 1500,
+          duration: 2000,
           useNativeDriver: false,
         }),
         Animated.timing(timerGlowAnim, {
           toValue: 0,
-          duration: 1500,
+          duration: 2000,
           useNativeDriver: false,
         }),
       ])
     ).start();
   }, []);
 
-  // Load activities from API
+  // Load activities with sample data
   const loadActivities = useCallback(async () => {
     try {
       setIsLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await activityService.getActivities();
+      // Sample activities with different states
+      const sampleActivities: EnhancedActivity[] = [
+        {
+          id: "1",
+          title: "Morning Workout",
+          category: "Workout" as Category,
+          startDate: "2025/08/02",
+          endDate: "2025/08/02",
+          duration: "01:00:00",
+          color: "#00E5FF",
+          priority: 1,
+          isRunning: true,
+          currentTimer: "00:45:30",
+          remainingSeconds: 2730,
+          completionPercentage: 25,
+          elapsedSeconds: 870,
+          totalTimeSpent: 870,
+          lastStartTime: Date.now() - 870000,
+          streak: 7,
+        },
+        {
+          id: "2",
+          title: "Team Meeting",
+          category: "Work" as Category,
+          startDate: "2025/08/02",
+          endDate: "2025/08/02",
+          duration: "00:30:00",
+          color: "#9C6CDA",
+          priority: 2,
+          isRunning: true,
+          currentTimer: "00:25:00",
+          remainingSeconds: 1500,
+          completionPercentage: 17,
+          elapsedSeconds: 300,
+          totalTimeSpent: 300,
+          streak: 12,
+        },
+        {
+          id: "3",
+          title: "Read Book",
+          category: "Personal" as Category,
+          startDate: "2025/08/01",
+          endDate: "2025/08/01",
+          duration: "00:45:00",
+          color: "#4ECDC4",
+          priority: 3,
+          isCompleted: true,
+          currentTimer: "00:00:00",
+          remainingSeconds: 0,
+          completionPercentage: 100,
+          elapsedSeconds: 2700,
+          totalTimeSpent: 2700,
+          streak: 1,
+          lastCompletedDate: "2025/08/01",
+        },
+        {
+          id: "4",
+          title: "Learn React Native",
+          category: "Personal" as Category,
+          startDate: "2025/08/02",
+          endDate: "2025/08/02",
+          duration: "02:00:00",
+          color: "#FF9500",
+          priority: 2,
+          isPaused: true,
+          isRunning: false,
+          currentTimer: "01:30:45",
+          remainingSeconds: 5445,
+          completionPercentage: 24,
+          elapsedSeconds: 1755,
+          totalTimeSpent: 1755,
+          streak: 3,
+        },
+        {
+          id: "9",
+          title: "Daily Meditation",
+          category: "Personal" as Category,
+          startDate: "2025/08/01",
+          endDate: "2025/08/01",
+          duration: "00:20:00",
+          color: "#9C6CDA",
+          priority: 1,
+          isCompleted: true,
+          currentTimer: "00:00:00",
+          remainingSeconds: 0,
+          completionPercentage: 100,
+          elapsedSeconds: 1200,
+          totalTimeSpent: 1200,
+          streak: 5,
+          lastCompletedDate: "2025/08/01",
+        },
+        {
+          id: "5",
+          title: "Gym Session",
+          category: "Workout" as Category,
+          startDate: "2025/08/03",
+          endDate: "2025/08/03",
+          duration: "01:30:00",
+          color: "#FF4757",
+          priority: 1,
+          isFuture: true,
+          currentTimer: "01:30:00",
+          remainingSeconds: 5400,
+          completionPercentage: 0,
+          elapsedSeconds: 0,
+          totalTimeSpent: 0,
+          streak: 8,
+        },
+        {
+          id: "6",
+          title: "Project Planning",
+          category: "Work" as Category,
+          startDate: "2025/08/02",
+          endDate: "2025/08/02",
+          duration: "01:15:00",
+          color: "#00E5FF",
+          priority: 1,
+          isRunning: false,
+          currentTimer: "01:15:00",
+          remainingSeconds: 4500,
+          completionPercentage: 0,
+          elapsedSeconds: 0,
+          totalTimeSpent: 0,
+          streak: 3,
+        },
+        {
+          id: "7",
+          title: "Meditation",
+          category: "Personal" as Category,
+          startDate: "2025/08/02",
+          endDate: "2025/08/02",
+          duration: "00:20:00",
+          color: "#9C6CDA",
+          priority: 3,
+          isRunning: false,
+          currentTimer: "00:20:00",
+          remainingSeconds: 1200,
+          completionPercentage: 0,
+          elapsedSeconds: 0,
+          totalTimeSpent: 0,
+          streak: 0,
+        },
+        {
+          id: "8",
+          title: "Code Review",
+          category: "Work" as Category,
+          startDate: "2025/08/02",
+          endDate: "2025/08/02",
+          duration: "00:45:00",
+          color: "#4ECDC4",
+          priority: 2,
+          isRunning: false,
+          currentTimer: "00:45:00",
+          remainingSeconds: 2700,
+          completionPercentage: 0,
+          elapsedSeconds: 0,
+          totalTimeSpent: 0,
+          streak: 0,
+        },
+      ];
 
-      // For now, start with empty array until API is implemented
-      setActivities([]);
+      setActivities(sampleActivities);
     } catch (error) {
       console.error("Failed to load activities:", error);
       Alert.alert("Error", "Failed to load activities. Please try again.");
@@ -285,13 +447,13 @@ const ActivityScreen = () => {
     const createPulseAnimation = () => {
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.08,
-          duration: 1200,
+          toValue: 1.05,
+          duration: 1000,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1200,
+          duration: 1000,
           useNativeDriver: true,
         }),
       ]).start(() => {
@@ -322,9 +484,6 @@ const ActivityScreen = () => {
         if (!activity) return;
 
         const newIsRunning = !activity.isRunning;
-
-        // TODO: Replace with actual API call
-        // await activityService.updateTimer(id, { isRunning: newIsRunning });
 
         setActivities((prevActivities) =>
           prevActivities.map((a) => {
@@ -465,9 +624,6 @@ const ActivityScreen = () => {
     if (!activityToDelete) return;
 
     try {
-      // TODO: Replace with actual API call
-      // await activityService.deleteActivity(activityToDelete.id);
-
       setActivities((prevActivities) =>
         prevActivities.filter((activity) => activity.id !== activityToDelete.id)
       );
@@ -501,9 +657,6 @@ const ActivityScreen = () => {
           duration: duration,
           priority: newActivity.priority || Math.floor(Math.random() * 100) + 1,
         } as EnhancedActivity;
-
-        // TODO: Replace with actual API call
-        // const savedActivity = await activityService.createActivity(activity);
 
         setActivities((prev) => [...prev, activity]);
         setModalVisible(false);
@@ -553,26 +706,6 @@ const ActivityScreen = () => {
       }),
     ]).start();
   }, []);
-
-  // Logout handler
-  const handleLogout = useCallback(async () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        onPress: async () => {
-          try {
-            await logout();
-            navigation.navigate("Login");
-          } catch (error) {
-            console.error("Logout failed:", error);
-            Alert.alert("Error", "Failed to logout. Please try again.");
-          }
-        },
-        style: "destructive",
-      },
-    ]);
-  }, [logout, navigation]);
 
   // Filtered and sorted activities
   const filteredAndSortedActivities = useMemo(() => {
@@ -625,7 +758,60 @@ const ActivityScreen = () => {
     };
   }, [activities, formatTimeHHMMSS]);
 
-  // Enhanced activity item renderer
+  // Helper function to render streak stars
+  const renderStreakStars = useCallback(
+    (streak: number, isFuture: boolean = false, isRunning: boolean = false) => {
+      const maxStars = 7;
+      const starsToShow = Math.min(streak, maxStars);
+      const stars = [];
+
+      // Different colors for different activity states
+      let filledColor, emptyColor, overflowColor;
+
+      if (isFuture) {
+        filledColor = "#666666"; // Gray for future
+        emptyColor = "rgba(102, 102, 102, 0.3)";
+        overflowColor = "#666666";
+      } else if (isRunning) {
+        filledColor = "#00E5FF"; // Cyan for running
+        emptyColor = "rgba(0, 229, 255, 0.3)";
+        overflowColor = "#00E5FF";
+      } else {
+        filledColor = "#FFD700"; // Gold for completed
+        emptyColor = "rgba(255, 215, 0, 0.3)";
+        overflowColor = "#FFD700";
+      }
+
+      for (let i = 0; i < maxStars; i++) {
+        const isFilled = i < starsToShow;
+        const isSpecial = i === 6 && streak > maxStars; // Special star for overflow
+
+        stars.push(
+          <View key={i} style={styles.streakStarContainer}>
+            <Icon
+              name={isFilled ? "star" : "star-outline"}
+              size={scale(12)}
+              color={
+                isSpecial ? overflowColor : isFilled ? filledColor : emptyColor
+              }
+            />
+            {isSpecial && (
+              <Text
+                style={[styles.streakOverflowText, { color: overflowColor }]}
+              >
+                +{streak - maxStars}
+              </Text>
+            )}
+          </View>
+        );
+      }
+
+      return stars;
+    },
+    []
+  );
+
+  // Enhanced activity item renderer with optimized layout
   const renderActivityItem = useCallback(
     ({ item, index }: { item: EnhancedActivity; index: number }) => {
       const isFuture = isActivityInFuture(item);
@@ -640,24 +826,14 @@ const ActivityScreen = () => {
             {
               opacity: fadeAnim,
               transform: [
-                {
-                  translateY: slideAnim.interpolate({
-                    inputRange: [0, 50],
-                    outputRange: [0, 50],
-                  }),
-                },
+                { translateY: slideAnim },
                 { scale: isLongPressed ? scaleAnim : 1 },
               ],
             },
           ]}
         >
           <TouchableOpacity
-            style={[
-              styles.activityItem,
-              isFuture && styles.futureActivityItem,
-              isCompleted && styles.completedActivityItem,
-              item.isRunning && styles.runningActivityItem,
-            ]}
+            style={styles.activityItem}
             onPress={() => {
               if (deleteMode.current && isLongPressed) {
                 resetDeleteMode();
@@ -706,224 +882,200 @@ const ActivityScreen = () => {
               </LinearGradient>
             ) : (
               <LinearGradient
-                colors={getGradientColors(item)}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.activityContent}
+                colors={getCardBackground(item)}
+                style={styles.cardGradient}
               >
-                {/* Enhanced glow effect for running items */}
-                {item.isRunning && (
-                  <Animated.View
-                    style={[
-                      styles.activityGlow,
-                      {
-                        opacity: timerGlowAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.2, 0.7],
-                        }),
-                      },
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={[
-                        "rgba(0, 229, 255, 0.3)",
-                        "rgba(156, 108, 218, 0.3)",
-                      ]}
-                      style={styles.glowGradient}
-                    />
-                  </Animated.View>
-                )}
+                <View style={styles.cardContainer}>
+                  {/* Header Row: Title, Category, and Control Button */}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.titleSection}>
+                      <Text style={styles.activityTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      {isFuture && (
+                        <Text style={styles.scheduledText}>Scheduled</Text>
+                      )}
+                    </View>
 
-                {/* Progress indicator */}
-                {!isFuture &&
-                  !isCompleted &&
-                  item.completionPercentage &&
-                  item.completionPercentage > 0 && (
-                    <View style={styles.progressIndicator}>
+                    <View style={styles.headerRight}>
                       <View
                         style={[
-                          styles.progressBar,
-                          { width: `${item.completionPercentage}%` },
-                        ]}
-                      />
-                    </View>
-                  )}
-
-                <View style={styles.cardLeft}>
-                  <View style={styles.titleContainer}>
-                    <Text
-                      style={[
-                        styles.activityTitle,
-                        isFuture && styles.futureActivityText,
-                        isCompleted && styles.completedActivityText,
-                      ]}
-                    >
-                      {item.title}
-                      {isFuture && " (Future)"}
-                    </Text>
-
-                    {/* Priority indicator */}
-                    {item.priority && item.priority <= 3 && (
-                      <View
-                        style={[
-                          styles.priorityBadge,
-                          {
-                            backgroundColor:
-                              item.priority === 1
-                                ? "#FF4757"
-                                : item.priority === 2
-                                ? "#FF9500"
-                                : "#FFD700",
-                          },
+                          styles.categoryBadge,
+                          isCompleted && styles.completedCategoryBadge,
                         ]}
                       >
-                        <Icon name="flag" size={scale(10)} color="#fff" />
-                      </View>
-                    )}
-                  </View>
-
-                  {isCompleted ? (
-                    <View style={styles.completedMessageContainer}>
-                      <Icon
-                        name="checkmark-circle"
-                        size={scale(20)}
-                        color="#fff"
-                      />
-                      <Text style={styles.completedMessageText}>
-                        Completed! Streak: {item.streak || 0} days
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.datesContainer}>
-                      <View style={styles.dateContainer}>
-                        <Icon
-                          name="calendar-outline"
-                          size={scale(12)}
-                          color={isFuture ? "#aaa" : "#fff"}
-                        />
                         <Text
                           style={[
-                            styles.dateText,
-                            isFuture && styles.futureActivityText,
+                            styles.categoryText,
+                            isCompleted && styles.completedCategoryText,
                           ]}
                         >
-                          {item.startDate}
+                          {item.category.toUpperCase()}
                         </Text>
                       </View>
-                      <View style={styles.dateContainer}>
-                        <Icon
-                          name="time-outline"
-                          size={scale(12)}
-                          color={isFuture ? "#aaa" : "#fff"}
-                        />
-                        <Text
-                          style={[
-                            styles.dateText,
-                            isFuture && styles.futureActivityText,
-                          ]}
-                        >
-                          {item.duration}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
 
-                <View style={styles.cardRight}>
-                  <View style={styles.categoryContainer}>
-                    <LinearGradient
-                      colors={["rgba(0, 0, 0, 0.3)", "rgba(0, 0, 0, 0.5)"]}
-                      style={styles.categoryGradient}
-                    >
-                      <Icon
-                        name={
-                          item.category === "Personal"
-                            ? "person-outline"
-                            : item.category === "Work"
-                            ? "briefcase-outline"
-                            : "fitness-outline"
-                        }
-                        size={scale(12)}
-                        color={isFuture ? "#aaa" : "#fff"}
-                      />
-                      <Text
-                        style={[
-                          styles.categoryText,
-                          isFuture && styles.futureActivityText,
-                        ]}
-                      >
-                        {item.category}
-                      </Text>
-                    </LinearGradient>
-                  </View>
-
-                  {!isFuture && !isCompleted && (
-                    <View style={styles.timerControlContainer}>
-                      <TouchableOpacity
-                        style={[
-                          styles.playButton,
-                          item.isRunning && styles.playButtonActive,
-                        ]}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          toggleTimer(item.id);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <LinearGradient
-                          colors={
-                            item.isRunning
-                              ? [
-                                  "rgba(255, 255, 255, 0.3)",
-                                  "rgba(255, 255, 255, 0.1)",
-                                ]
-                              : ["rgba(0, 0, 0, 0.3)", "rgba(0, 0, 0, 0.5)"]
-                          }
-                          style={styles.playButtonGradient}
-                        >
-                          <Animated.View
-                            style={{
-                              transform: [
-                                { scale: item.isRunning ? pulseAnim : 1 },
-                              ],
+                      {/* Control Button */}
+                      <View style={styles.controlSection}>
+                        {!isFuture && !isCompleted && (
+                          <TouchableOpacity
+                            style={[
+                              styles.controlButton,
+                              item.isRunning && styles.activeControlButton,
+                            ]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              toggleTimer(item.id);
                             }}
+                            activeOpacity={0.7}
                           >
-                            <Icon
-                              name={item.isRunning ? "pause" : "play"}
-                              size={scale(18)}
-                              color="#fff"
-                            />
-                          </Animated.View>
-                        </LinearGradient>
-                      </TouchableOpacity>
+                            <Animated.View
+                              style={{
+                                transform: [
+                                  { scale: item.isRunning ? pulseAnim : 1 },
+                                ],
+                              }}
+                            >
+                              <Icon
+                                name={item.isRunning ? "pause" : "play"}
+                                size={scale(16)}
+                                color="#000000"
+                              />
+                            </Animated.View>
+                          </TouchableOpacity>
+                        )}
 
-                      <View style={styles.remainingTimeContainer}>
-                        <LinearGradient
-                          colors={["rgba(0, 0, 0, 0.4)", "rgba(0, 0, 0, 0.6)"]}
-                          style={styles.timeGradient}
-                        >
-                          <Text style={styles.remainingTimeValue}>
+                        {isCompleted && (
+                          <View style={styles.completedButton}>
+                            <Icon
+                              name="checkmark-circle"
+                              size={scale(24)}
+                              color="#4ECDC4"
+                            />
+                          </View>
+                        )}
+
+                        {isFuture && (
+                          <View style={styles.futureButton}>
+                            <Icon
+                              name="time-outline"
+                              size={scale(20)}
+                              color="#666666"
+                            />
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Main Content Row: Timer/Status and Duration */}
+                  <View style={styles.cardMainContent}>
+                    <View style={styles.leftContent}>
+                      {!isFuture && !isCompleted && (
+                        <View style={styles.timerSection}>
+                          <Text style={styles.timerValue}>
                             {item.currentTimer}
                           </Text>
-                        </LinearGradient>
-                      </View>
-                    </View>
-                  )}
+                          <Text style={styles.timerLabel}>remaining</Text>
+                        </View>
+                      )}
 
-                  {isCompleted && (
-                    <View style={styles.completedIcon}>
-                      <LinearGradient
-                        colors={GradientConfigs.completed}
-                        style={styles.completedIconGradient}
-                      >
-                        <Icon
-                          name="checkmark-circle"
-                          size={scale(30)}
-                          color="#fff"
-                        />
-                      </LinearGradient>
+                      {isCompleted && (
+                        <View style={styles.completedSection}>
+                          <View style={styles.congratsRow}>
+                            <Icon
+                              name="trophy"
+                              size={scale(14)}
+                              color="#4ECDC4"
+                            />
+                            <Text style={styles.congratsText}>Completed!</Text>
+                          </View>
+                          <View style={styles.streakContainer}>
+                            <Text style={styles.streakLabel}>Streak</Text>
+                            <View style={styles.streakStarsRow}>
+                              {renderStreakStars(
+                                item.streak || 0,
+                                false,
+                                false
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                      )}
+
+                      {isFuture && (
+                        <View style={styles.futureSection}>
+                          <Text style={styles.futureLabel}>Starts in</Text>
+                          <Text style={styles.futureDate}>
+                            {item.startDate}
+                          </Text>
+                          {item.streak && item.streak > 0 && (
+                            <View style={styles.futureStreakContainer}>
+                              <Text style={styles.futureStreakLabel}>
+                                Previous streak
+                              </Text>
+                              <View style={styles.futureStreakStarsRow}>
+                                {renderStreakStars(item.streak, true, false)}
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      )}
                     </View>
-                  )}
+
+                    <View style={styles.rightContent}>
+                      <Text style={styles.durationText}>{item.duration}</Text>
+                      {!isFuture &&
+                        !isCompleted &&
+                        item.streak &&
+                        item.streak > 0 && (
+                          <View style={styles.runningStreakContainer}>
+                            <Text style={styles.runningStreakLabel}>
+                              Streak
+                            </Text>
+                            <View style={styles.runningStreakStarsRow}>
+                              {renderStreakStars(item.streak, false, true)}
+                            </View>
+                          </View>
+                        )}
+                    </View>
+                  </View>
+
+                  {/* Bottom Row: Progress Bar and Dates */}
+                  <View style={styles.cardFooter}>
+                    <View style={styles.progressSection}>
+                      {!isFuture &&
+                        item.completionPercentage !== undefined &&
+                        item.completionPercentage > 0 && (
+                          <View style={styles.progressContainer}>
+                            <View style={styles.progressTrack}>
+                              <View
+                                style={[
+                                  styles.progressFill,
+                                  {
+                                    width: `${item.completionPercentage}%`,
+                                    backgroundColor: isCompleted
+                                      ? "#4ECDC4"
+                                      : item.isRunning
+                                      ? "#00E5FF"
+                                      : "#FF9500",
+                                  },
+                                ]}
+                              />
+                            </View>
+                            <Text style={styles.progressPercentage}>
+                              {item.completionPercentage}%
+                            </Text>
+                          </View>
+                        )}
+                    </View>
+
+                    <View style={styles.dateSection}>
+                      <Text style={styles.dateText}>{item.startDate}</Text>
+                      {item.startDate !== item.endDate && (
+                        <Text style={styles.dateText}>→ {item.endDate}</Text>
+                      )}
+                    </View>
+                  </View>
                 </View>
               </LinearGradient>
             )}
@@ -942,8 +1094,6 @@ const ActivityScreen = () => {
       navigation,
       handleLongPress,
       showDeleteConfirmation,
-      getGradientColors,
-      timerGlowAnim,
       toggleTimer,
       pulseAnim,
     ]
@@ -959,25 +1109,25 @@ const ActivityScreen = () => {
           backgroundColor={ThemeColors.background}
         />
 
-        {/* Enhanced animated background */}
-        <View style={styles.background}>
-          {[...Array(8)].map((_, index) => (
+        {/* Background */}
+        <View style={styles.backgroundContainer}>
+          {[...Array(12)].map((_, index) => (
             <Animated.View
               key={`bg-element-${index}`}
               style={[
                 styles.backgroundElement,
                 {
-                  left: `${10 + index * 12}%`,
-                  top: `${5 + (index % 4) * 20}%`,
+                  left: `${5 + (index % 6) * 15}%`,
+                  top: `${5 + Math.floor(index / 6) * 30}%`,
                   opacity: fadeAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, 0.08],
+                    outputRange: [0, 0.03],
                   }),
                   transform: [
                     {
                       rotate: fadeAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: ["0deg", "360deg"],
+                        outputRange: ["0deg", "180deg"],
                       }),
                     },
                   ],
@@ -985,256 +1135,188 @@ const ActivityScreen = () => {
               ]}
             >
               <LinearGradient
-                colors={GradientConfigs.primary}
+                colors={["#6C5CE7", "#A29BFE"]}
                 style={styles.backgroundElementGradient}
               />
             </Animated.View>
           ))}
         </View>
 
-        {/* Enhanced Header */}
+        {/* Header Section */}
         <Animated.View
           style={[
-            styles.header,
+            styles.headerContainer,
             {
               opacity: fadeAnim,
-              transform: [
-                { translateY: slideAnim },
-                { scale: headerScaleAnim },
-              ],
+              transform: [{ scale: headerScaleAnim }],
             },
           ]}
         >
-          <View style={styles.headerLeft}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.mainTitle}>Activity Hub</Text>
+            <Text style={styles.subtitle}>Track & Manage Your Activities</Text>
+          </View>
+
+          {/* Action Buttons Row */}
+          <View style={styles.headerActionsRow}>
             <TouchableOpacity
-              style={styles.headerButton}
-              onPress={() => navigation.navigate("Settings")}
+              style={styles.headerActionButton}
+              onPress={() => navigation.navigate("Task")}
+              activeOpacity={0.8}
             >
               <LinearGradient
-                colors={
-                  ["rgba(0, 229, 255, 0.2)", "rgba(0, 229, 255, 0.1)"] as [
-                    string,
-                    string
-                  ]
-                }
+                colors={[
+                  "rgba(156, 108, 218, 0.2)",
+                  "rgba(156, 108, 218, 0.1)",
+                ]}
+                style={styles.headerButtonGradient}
+              >
+                <Icon
+                  name="checkbox-outline"
+                  size={scale(14)}
+                  color="#9C6CDA"
+                />
+                <Text style={styles.headerButtonText}>Tasks</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.headerActionButton}
+              onPress={() => navigation.navigate("Stats", {})}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["rgba(78, 205, 196, 0.2)", "rgba(78, 205, 196, 0.1)"]}
+                style={styles.headerButtonGradient}
+              >
+                <Icon
+                  name="analytics-outline"
+                  size={scale(14)}
+                  color="#4ECDC4"
+                />
+                <Text style={styles.headerButtonText}>Analytics</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.headerActionButton}
+              onPress={() => navigation.navigate("Settings")}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["rgba(0, 229, 255, 0.2)", "rgba(0, 229, 255, 0.1)"]}
                 style={styles.headerButtonGradient}
               >
                 <Icon
                   name="settings-outline"
-                  size={scale(24)}
-                  color={ThemeColors.primary}
+                  size={scale(14)}
+                  color="#00E5FF"
                 />
-              </LinearGradient>
-            </TouchableOpacity>
-            <View style={styles.headerTitleContainer}>
-              <Text style={styles.headerTitle}>Activity Manager</Text>
-              <Text style={styles.headerSubtitle}>Track your progress</Text>
-            </View>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={() =>
-                navigation.navigate("Stats", { activeTab: "activities" })
-              }
-            >
-              <LinearGradient
-                colors={
-                  ["rgba(156, 108, 218, 0.2)", "rgba(156, 108, 218, 0.1)"] as [
-                    string,
-                    string
-                  ]
-                }
-                style={styles.headerButtonGradient}
-              >
-                <Icon
-                  name="bar-chart-outline"
-                  size={scale(24)}
-                  color={ThemeColors.secondary}
-                />
-              </LinearGradient>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={handleLogout}
-            >
-              <LinearGradient
-                colors={
-                  ["rgba(255, 71, 87, 0.2)", "rgba(255, 71, 87, 0.1)"] as [
-                    string,
-                    string
-                  ]
-                }
-                style={styles.headerButtonGradient}
-              >
-                <Icon
-                  name="log-out-outline"
-                  size={scale(24)}
-                  color={ThemeColors.danger}
-                />
+                <Text style={styles.headerButtonText}>Settings</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </Animated.View>
 
-        {/* Enhanced Statistics Card */}
+        {/* Compact Analytics Section */}
         <Animated.View
           style={[
-            styles.statsCard,
+            styles.compactAnalyticsContainer,
             {
               opacity: fadeAnim,
-              transform: [{ scale: statsCardAnim }],
+              transform: [{ translateY: statsSlideAnim }],
             },
           ]}
         >
           <LinearGradient
-            colors={
-              ["rgba(26, 26, 26, 0.95)", "rgba(42, 42, 42, 0.95)"] as [
-                string,
-                string
-              ]
-            }
-            style={styles.statsContainer}
+            colors={["rgba(30, 30, 30, 0.8)", "rgba(44, 44, 46, 0.6)"]}
+            style={styles.compactAnalyticsCard}
           >
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.total}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: ThemeColors.primary }]}>
-                {stats.running}
-              </Text>
-              <Text style={styles.statLabel}>Running</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: ThemeColors.success }]}>
-                {stats.completed}
-              </Text>
-              <Text style={styles.statLabel}>Completed</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text
-                style={[styles.statValue, { color: ThemeColors.secondary }]}
-              >
-                {stats.completionRate}%
-              </Text>
-              <Text style={styles.statLabel}>Success Rate</Text>
+            <View style={styles.compactStatsRow}>
+              {/* Total Activities */}
+              <View style={styles.compactStatItem}>
+                <View
+                  style={[
+                    styles.compactStatIcon,
+                    { backgroundColor: "rgba(176, 176, 176, 0.2)" },
+                  ]}
+                >
+                  <Icon name="grid-outline" size={scale(14)} color="#B0B0B0" />
+                </View>
+                <Text style={styles.compactStatNumber}>{stats.total}</Text>
+                <Text style={styles.compactStatLabel}>Total</Text>
+              </View>
+
+              {/* Active */}
+              <View style={styles.compactStatItem}>
+                <View
+                  style={[
+                    styles.compactStatIcon,
+                    { backgroundColor: "rgba(0, 229, 255, 0.2)" },
+                  ]}
+                >
+                  <Icon name="play-circle" size={scale(14)} color="#00E5FF" />
+                </View>
+                <Text style={[styles.compactStatNumber, { color: "#00E5FF" }]}>
+                  {stats.running}
+                </Text>
+                <Text style={[styles.compactStatLabel, { color: "#00E5FF" }]}>
+                  Active
+                </Text>
+              </View>
+
+              {/* Completed */}
+              <View style={styles.compactStatItem}>
+                <View
+                  style={[
+                    styles.compactStatIcon,
+                    { backgroundColor: "rgba(78, 205, 196, 0.2)" },
+                  ]}
+                >
+                  <Icon
+                    name="checkmark-circle"
+                    size={scale(14)}
+                    color="#4ECDC4"
+                  />
+                </View>
+                <Text style={[styles.compactStatNumber, { color: "#4ECDC4" }]}>
+                  {stats.completed}
+                </Text>
+                <Text style={[styles.compactStatLabel, { color: "#4ECDC4" }]}>
+                  Done
+                </Text>
+              </View>
+
+              {/* Success Rate */}
+              <View style={styles.compactStatItem}>
+                <View
+                  style={[
+                    styles.compactStatIcon,
+                    { backgroundColor: "rgba(156, 108, 218, 0.2)" },
+                  ]}
+                >
+                  <Icon name="trending-up" size={scale(14)} color="#9C6CDA" />
+                </View>
+                <Text style={[styles.compactStatNumber, { color: "#9C6CDA" }]}>
+                  {stats.completionRate}%
+                </Text>
+                <Text style={[styles.compactStatLabel, { color: "#9C6CDA" }]}>
+                  Success
+                </Text>
+              </View>
             </View>
           </LinearGradient>
         </Animated.View>
 
-        {/* Enhanced Tab Container */}
-        <Animated.View
-          style={[
-            styles.tabCard,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateX: tabSlideAnim }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={
-              ["rgba(26, 26, 26, 0.95)", "rgba(42, 42, 42, 0.95)"] as [
-                string,
-                string
-              ]
-            }
-            style={styles.tabContainer}
-          >
-            <TouchableOpacity
-              style={[styles.tab, activeTab === "ACTIVITY" && styles.activeTab]}
-              onPress={() => setActiveTab("ACTIVITY")}
-            >
-              {activeTab === "ACTIVITY" && (
-                <LinearGradient
-                  colors={GradientConfigs.primary}
-                  style={styles.activeTabGradient}
-                />
-              )}
-              <Icon
-                name="list-outline"
-                size={scale(18)}
-                color={activeTab === "ACTIVITY" ? "#FFFFFF" : "#9C9C9C"}
-                style={styles.tabIcon}
-              />
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === "ACTIVITY" && styles.activeTabText,
-                ]}
-              >
-                Activities
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === "TASK" && styles.activeTab]}
-              onPress={() => {
-                setActiveTab("TASK");
-                navigation.navigate("Task");
-              }}
-            >
-              {activeTab === "TASK" && (
-                <LinearGradient
-                  colors={GradientConfigs.primary}
-                  style={styles.activeTabGradient}
-                />
-              )}
-              <Icon
-                name="checkbox-outline"
-                size={scale(18)}
-                color={activeTab === "TASK" ? "#FFFFFF" : "#9C9C9C"}
-                style={styles.tabIcon}
-              />
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === "TASK" && styles.activeTabText,
-                ]}
-              >
-                Tasks
-              </Text>
-            </TouchableOpacity>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* Enhanced Add Button */}
-        <Animated.View
-          style={[
-            styles.addButtonCard,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setModalVisible(true)}
-          >
-            <LinearGradient
-              colors={GradientConfigs.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.addButtonGradient}
-            >
-              <Icon name="add" size={scale(24)} color="#fff" />
-              <Text style={styles.addButtonText}>Create New Activity</Text>
-              <Icon
-                name="arrow-forward"
-                size={scale(20)}
-                color="rgba(255, 255, 255, 0.7)"
-              />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Enhanced Activities List */}
+        {/* Activities List */}
         <FlatList
           data={filteredAndSortedActivities}
           renderItem={renderActivityItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.activityList}
+          contentContainerStyle={[
+            styles.activityList,
+            { paddingTop: scale(8), paddingBottom: scale(100) },
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -1246,29 +1328,96 @@ const ActivityScreen = () => {
           }
           ListEmptyComponent={() => (
             <View style={styles.emptyState}>
-              <Icon
-                name="calendar-outline"
-                size={scale(60)}
-                color={ThemeColors.textSecondary}
-              />
-              <Text style={styles.emptyStateTitle}>No activities yet</Text>
-              <Text style={styles.emptyStateText}>
-                Create your first activity to start tracking your progress
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyStateButton}
-                onPress={() => setModalVisible(true)}
+              <LinearGradient
+                colors={["#1A1A1A", "#2A2A2A"]}
+                style={styles.emptyStateGradient}
               >
-                <LinearGradient
-                  colors={GradientConfigs.primary}
-                  style={styles.emptyStateButtonGradient}
+                <Icon name="time-outline" size={scale(64)} color="#00E5FF" />
+                <Text style={styles.emptyStateTitle}>No activities yet</Text>
+                <Text style={styles.emptyStateText}>
+                  Start tracking your productivity by creating your first
+                  activity
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyStateButton}
+                  onPress={() => setModalVisible(true)}
                 >
-                  <Text style={styles.emptyStateButtonText}>Get Started</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={GradientConfigs.primary}
+                    style={styles.emptyStateButtonGradient}
+                  >
+                    <Icon name="add" size={scale(18)} color="#FFFFFF" />
+                    <Text style={styles.emptyStateButtonText}>
+                      Create Activity
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </LinearGradient>
             </View>
           )}
         />
+
+        {/* Floating Action Button */}
+        <Animated.View
+          style={[
+            styles.fabContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: fabScaleAnim }],
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.fab}
+            activeOpacity={0.85}
+            onPress={() => setModalVisible(true)}
+          >
+            {/* Glow Effect */}
+            <Animated.View
+              style={[
+                styles.fabGlow,
+                {
+                  opacity: timerGlowAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.3, 0.7],
+                  }),
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={["rgba(0, 229, 255, 0.4)", "rgba(156, 108, 218, 0.4)"]}
+                style={styles.glowGradient}
+              />
+            </Animated.View>
+
+            <LinearGradient
+              colors={["#00E5FF", "#9C6CDA", "#4ECDC4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.fabGradient}
+            >
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      scale: pulseAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.05],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Icon
+                  name="add"
+                  size={scale(28)}
+                  color="#FFFFFF"
+                  style={styles.fabIcon}
+                />
+              </Animated.View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Add Activity Modal */}
         <AddActivityModal
@@ -1277,7 +1426,7 @@ const ActivityScreen = () => {
           onAdd={handleAddActivity}
         />
 
-        {/* Enhanced Delete Confirmation Modal */}
+        {/* Delete Confirmation Modal */}
         <Modal
           visible={deleteModalVisible}
           transparent={true}
@@ -1295,12 +1444,7 @@ const ActivityScreen = () => {
               ]}
             >
               <LinearGradient
-                colors={
-                  ["rgba(26, 26, 26, 0.98)", "rgba(42, 42, 42, 0.98)"] as [
-                    string,
-                    string
-                  ]
-                }
+                colors={["#1A1A1A", "#2A2A2A"]}
                 style={styles.deleteModalGradient}
               >
                 <Icon
@@ -1321,12 +1465,10 @@ const ActivityScreen = () => {
                     onPress={closeDeleteModal}
                   >
                     <LinearGradient
-                      colors={
-                        ["rgba(60, 60, 60, 0.8)", "rgba(80, 80, 80, 0.8)"] as [
-                          string,
-                          string
-                        ]
-                      }
+                      colors={[
+                        "rgba(139, 148, 158, 0.2)",
+                        "rgba(139, 148, 158, 0.1)",
+                      ]}
                       style={styles.modalButtonGradient}
                     >
                       <Text style={styles.deleteModalButtonText}>Cancel</Text>
@@ -1360,7 +1502,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: ThemeColors.background,
   },
-  background: {
+
+  // Background
+  backgroundContainer: {
     position: "absolute",
     top: 0,
     left: 0,
@@ -1369,406 +1513,431 @@ const styles = StyleSheet.create({
   },
   backgroundElement: {
     position: "absolute",
-    width: scale(12),
-    height: scale(12),
-    borderRadius: scale(6),
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
     overflow: "hidden",
   },
   backgroundElementGradient: {
     flex: 1,
-    borderRadius: scale(6),
+    borderRadius: scale(4),
   },
 
-  // Enhanced Header styles
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  // Header Section
+  headerContainer: {
+    paddingTop: Platform.OS === "ios" ? scale(50) : scale(35),
     paddingHorizontal: scale(20),
-    paddingTop: Platform.OS === "ios" ? scale(55) : scale(35),
-    paddingBottom: scale(20),
+    paddingBottom: scale(16),
   },
-  headerLeft: {
-    flexDirection: "row",
+  titleContainer: {
     alignItems: "center",
-    flex: 1,
+    marginBottom: scale(16),
   },
-  headerRight: {
+  mainTitle: {
+    fontSize: scale(32),
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: -1,
+    textAlign: "center",
+    marginBottom: scale(4),
+  },
+  subtitle: {
+    fontSize: scale(14),
+    color: "#B0B0B0",
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  headerActionsRow: {
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "center",
     gap: scale(12),
   },
-  headerButton: {
-    width: scale(48),
-    height: scale(48),
-    borderRadius: scale(24),
+  headerActionButton: {
+    borderRadius: scale(10),
     overflow: "hidden",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    flex: 1,
+    maxWidth: scale(120),
   },
   headerButtonGradient: {
-    flex: 1,
-    justifyContent: "center",
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: scale(14),
+    paddingVertical: scale(10),
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
-  headerTitleContainer: {
-    marginLeft: scale(15),
-  },
-  headerTitle: {
-    color: ThemeColors.text,
-    fontWeight: "900",
-    fontSize: scale(28),
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    color: ThemeColors.textSecondary,
+  headerButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
     fontSize: scale(14),
-    marginTop: scale(2),
+    marginLeft: scale(8),
   },
 
-  // Enhanced Statistics Card
-  statsCard: {
+  // Compact Analytics Section
+  compactAnalyticsContainer: {
     marginHorizontal: scale(20),
-    marginBottom: scale(15),
-    borderRadius: scale(20),
+    marginBottom: scale(16),
+    borderRadius: scale(14),
+    overflow: "hidden",
+  },
+  compactAnalyticsCard: {
+    padding: scale(14),
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  compactStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  compactStatItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  compactStatIcon: {
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: scale(6),
+  },
+  compactStatNumber: {
+    fontSize: scale(18),
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+    marginBottom: scale(2),
+  },
+  compactStatLabel: {
+    fontSize: scale(10),
+    fontWeight: "600",
+    color: "#B0B0B0",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+
+  // Activity List
+  activityList: {
+    paddingHorizontal: scale(20),
+    paddingBottom: scale(100),
+  },
+  activityItemContainer: {
+    marginBottom: scale(12),
+  },
+  activityItem: {
+    borderRadius: scale(18),
     overflow: "hidden",
     elevation: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-  },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: scale(20),
-    borderWidth: 1,
-    borderColor: ThemeColors.border,
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  statValue: {
-    color: ThemeColors.text,
-    fontSize: scale(24),
-    fontWeight: "900",
-    marginBottom: scale(4),
-  },
-  statLabel: {
-    color: ThemeColors.textSecondary,
-    fontSize: scale(12),
-    fontWeight: "500",
+    height: scale(130),
   },
 
-  // Enhanced Tab styles
-  tabCard: {
-    marginHorizontal: scale(20),
-    marginBottom: scale(15),
-    borderRadius: scale(25),
-    overflow: "hidden",
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    borderWidth: 1,
-    borderColor: ThemeColors.border,
-    height: scale(56),
-  },
-  tab: {
+  // Enhanced Card Design
+  cardGradient: {
     flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    borderRadius: scale(25),
-    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
-  activeTab: {
-    // Active tab styling handled by gradient
-  },
-  activeTabGradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: scale(25),
-  },
-  tabIcon: {
-    marginRight: scale(8),
-    zIndex: 1,
-  },
-  tabText: {
-    color: "#9C9C9C",
-    fontWeight: "600",
-    fontSize: scale(16),
-    zIndex: 1,
-  },
-  activeTabText: {
-    color: ThemeColors.text,
-    fontWeight: "800",
-  },
-
-  // Enhanced Add button styles
-  addButtonCard: {
-    marginHorizontal: scale(20),
-    marginBottom: scale(15),
-    borderRadius: scale(18),
-    overflow: "hidden",
-    elevation: 6,
-    shadowColor: ThemeColors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-  },
-  addButton: {
-    borderRadius: scale(18),
-    overflow: "hidden",
-  },
-  addButtonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
+  cardContainer: {
+    flex: 1,
+    padding: scale(14),
     justifyContent: "space-between",
-    paddingHorizontal: scale(25),
-    paddingVertical: scale(18),
-  },
-  addButtonText: {
-    color: ThemeColors.text,
-    fontSize: scale(16),
-    fontWeight: "700",
-    flex: 1,
-    marginLeft: scale(12),
   },
 
-  // Enhanced Activity list styles
-  activityList: {
-    paddingHorizontal: scale(20),
-    paddingBottom: scale(30),
-  },
-  activityItemContainer: {
-    marginBottom: scale(16),
-  },
-  activityItem: {
-    borderRadius: scale(24),
-    overflow: "hidden",
-    minHeight: scale(130),
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-  },
-  futureActivityItem: {
-    opacity: 0.7,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    borderStyle: "dashed",
-  },
-  completedActivityItem: {
-    borderWidth: 2,
-    borderColor: ThemeColors.success,
-  },
-  runningActivityItem: {
-    borderWidth: 2,
-    borderColor: ThemeColors.primary,
-  },
-  activityContent: {
+  // Header Row: Title, Category, and Control Button
+  cardHeader: {
     flexDirection: "row",
-    padding: scale(22),
-    minHeight: scale(130),
     justifyContent: "space-between",
-    alignItems: "center",
-    position: "relative",
+    alignItems: "flex-start",
+    marginBottom: scale(10),
   },
-  activityGlow: {
-    position: "absolute",
-    top: -scale(15),
-    left: -scale(15),
-    right: -scale(15),
-    bottom: -scale(15),
-    borderRadius: scale(35),
-  },
-  glowGradient: {
+  titleSection: {
     flex: 1,
-    borderRadius: scale(35),
-  },
-
-  // Enhanced progress indicator
-  progressIndicator: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: scale(4),
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-  },
-  progressBar: {
-    height: "100%",
-    backgroundColor: ThemeColors.primary,
-  },
-
-  // Enhanced Card content styles
-  cardLeft: {
-    flex: 2.5,
-    justifyContent: "center",
-    paddingRight: scale(15),
-    zIndex: 1,
-  },
-  cardRight: {
-    flex: 2,
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    zIndex: 1,
-  },
-  titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: scale(8),
+    marginRight: scale(12),
   },
   activityTitle: {
-    fontWeight: "800",
-    color: ThemeColors.text,
-    fontSize: scale(18),
-    letterSpacing: 0.5,
-    flex: 1,
+    fontSize: scale(16),
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: scale(2),
+    letterSpacing: -0.3,
   },
-  priorityBadge: {
-    width: scale(20),
-    height: scale(20),
-    borderRadius: scale(10),
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: scale(8),
-  },
-  futureActivityText: {
-    color: ThemeColors.textSecondary,
-    opacity: 0.8,
-  },
-  completedActivityText: {
-    color: ThemeColors.text,
-  },
-  datesContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(16),
-  },
-  dateContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  dateText: {
-    color: ThemeColors.text,
-    marginLeft: scale(6),
-    fontSize: scale(12),
+  scheduledText: {
+    fontSize: scale(10),
+    color: "#B0B0B0",
     fontWeight: "500",
   },
-
-  // Enhanced category and timer styles
-  categoryContainer: {
-    marginRight: scale(15),
-    borderRadius: scale(20),
-    overflow: "hidden",
-  },
-  categoryGradient: {
-    flexDirection: "row",
+  categoryBadge: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(4),
+    borderRadius: scale(6),
+    minWidth: scale(70),
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: scale(14),
-    paddingVertical: scale(8),
+  },
+  completedCategoryBadge: {
+    backgroundColor: "rgba(78, 205, 196, 0.3)",
   },
   categoryText: {
-    color: ThemeColors.text,
-    marginLeft: scale(6),
-    fontWeight: "600",
-    fontSize: scale(12),
-  },
-  timerControlContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: scale(110),
-  },
-  playButton: {
-    width: scale(56),
-    height: scale(56),
-    borderRadius: scale(28),
-    marginBottom: scale(10),
-    overflow: "hidden",
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
-  playButtonActive: {
-    elevation: 8,
-    shadowColor: ThemeColors.primary,
-  },
-  playButtonGradient: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  remainingTimeContainer: {
-    borderRadius: scale(14),
-    overflow: "hidden",
-    minWidth: scale(90),
-  },
-  timeGradient: {
-    paddingHorizontal: scale(14),
-    paddingVertical: scale(8),
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  remainingTimeValue: {
-    color: ThemeColors.text,
+    fontSize: scale(9),
     fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  completedCategoryText: {
+    color: "#4ECDC4",
+  },
+
+  // Header Right Section
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(8),
+  },
+
+  // Main Content Row: Timer/Status and Duration
+  cardMainContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: scale(10),
+  },
+  leftContent: {
+    flex: 2,
+  },
+  rightContent: {
+    flex: 1,
+    alignItems: "flex-end",
+  },
+
+  // Timer Section
+  timerSection: {
+    alignItems: "flex-start",
+  },
+  timerValue: {
+    fontSize: scale(20),
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+  },
+  timerLabel: {
+    fontSize: scale(10),
+    fontWeight: "500",
+    color: "#B0B0B0",
+    marginTop: scale(1),
+  },
+
+  // Completed Section
+  completedSection: {
+    alignItems: "flex-start",
+  },
+  congratsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: scale(2),
+  },
+  congratsText: {
     fontSize: scale(14),
+    fontWeight: "700",
+    color: "#4ECDC4",
+    marginLeft: scale(6),
+  },
+  // Streak Components
+  streakContainer: {
+    marginTop: scale(4),
+  },
+  streakLabel: {
+    fontSize: scale(9),
+    fontWeight: "600",
+    color: "#B0B0B0",
+    marginBottom: scale(2),
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  streakStarsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(2),
+  },
+  streakStarContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  streakOverflowText: {
+    position: "absolute",
+    top: -scale(2),
+    right: -scale(2),
+    fontSize: scale(6),
+    fontWeight: "700",
+    color: "#FFD700",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    borderRadius: scale(4),
+    paddingHorizontal: scale(2),
+    paddingVertical: scale(1),
+    minWidth: scale(12),
     textAlign: "center",
   },
 
-  // Enhanced completed activity styles
-  completedMessageContainer: {
+  // Future Streak Components
+  futureStreakContainer: {
+    marginTop: scale(4),
+  },
+  futureStreakLabel: {
+    fontSize: scale(8),
+    fontWeight: "600",
+    color: "#666666",
+    marginBottom: scale(2),
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  futureStreakStarsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(1),
+  },
+
+  // Running Streak Components
+  runningStreakContainer: {
+    marginTop: scale(6),
+    alignItems: "flex-end",
+  },
+  runningStreakLabel: {
+    fontSize: scale(7),
+    fontWeight: "600",
+    color: "#00E5FF",
+    marginBottom: scale(1),
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  runningStreakStarsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(1),
+  },
+
+  // Future Section
+  futureSection: {
+    alignItems: "flex-start",
+  },
+  futureLabel: {
+    fontSize: scale(12),
+    fontWeight: "600",
+    color: "#666666",
+  },
+  futureDate: {
+    fontSize: scale(10),
+    fontWeight: "500",
+    color: "#B0B0B0",
+    marginTop: scale(1),
+  },
+
+  // Duration Text
+  durationText: {
+    fontSize: scale(12),
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: scale(4),
+  },
+  dateText: {
+    fontSize: scale(9),
+    fontWeight: "500",
+    color: "#B0B0B0",
+  },
+
+  // Bottom Row: Progress and Control
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  // Card Footer: Progress Bar and Dates
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  // Date Section
+  dateSection: {
+    alignItems: "flex-end",
+  },
+  progressSection: {
+    flex: 1,
+    marginRight: scale(16),
+  },
+  progressContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
-  completedMessageText: {
-    color: ThemeColors.text,
-    marginLeft: scale(8),
-    fontWeight: "600",
-    fontSize: scale(14),
-  },
-  completedIcon: {
-    borderRadius: scale(28),
+  progressTrack: {
+    flex: 1,
+    height: scale(6),
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: scale(3),
     overflow: "hidden",
+    marginRight: scale(8),
   },
-  completedIconGradient: {
-    width: scale(56),
-    height: scale(56),
+  progressFill: {
+    height: "100%",
+    borderRadius: scale(3),
+  },
+  progressPercentage: {
+    fontSize: scale(10),
+    fontWeight: "700",
+    color: "#FFFFFF",
+    minWidth: scale(30),
+    textAlign: "right",
+  },
+
+  // Control Section
+  controlSection: {
+    alignItems: "center",
+  },
+  controlButton: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  activeControlButton: {
+    backgroundColor: "#FFFFFF",
+  },
+  completedButton: {
+    width: scale(36),
+    height: scale(36),
     justifyContent: "center",
     alignItems: "center",
   },
+  futureButton: {
+    width: scale(36),
+    height: scale(36),
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: scale(18),
+  },
 
-  // Enhanced delete mode styles
+  // Delete Mode
   deleteCardContent: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: scale(24),
     position: "relative",
-    minHeight: scale(130),
+    minHeight: scale(140),
+    padding: scale(20),
   },
   deleteIconContainer: {
     justifyContent: "center",
@@ -1777,138 +1946,199 @@ const styles = StyleSheet.create({
   deleteIconButton: {
     alignItems: "center",
     justifyContent: "center",
-    width: scale(140),
-    height: scale(90),
+    padding: scale(20),
   },
   deleteCardText: {
     color: ThemeColors.text,
-    fontWeight: "700",
-    marginTop: scale(10),
-    fontSize: scale(15),
+    fontWeight: "600",
+    marginTop: scale(8),
+    fontSize: scale(16),
+    letterSpacing: 0.2,
   },
   cancelDeleteButton: {
     position: "absolute",
-    top: scale(15),
-    right: scale(15),
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    top: scale(16),
+    right: scale(16),
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
     backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "center",
     alignItems: "center",
   },
 
-  // Enhanced modal styles
+  // Floating Action Button
+  fabContainer: {
+    position: "absolute",
+    bottom: scale(30),
+    right: scale(20),
+  },
+  fab: {
+    width: scale(56),
+    height: scale(56),
+    borderRadius: scale(28),
+    overflow: "hidden",
+    elevation: 12,
+    shadowColor: "#00E5FF",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+  },
+  fabGlow: {
+    position: "absolute",
+    top: -scale(8),
+    left: -scale(8),
+    right: -scale(8),
+    bottom: -scale(8),
+    borderRadius: scale(32),
+  },
+  glowGradient: {
+    flex: 1,
+    borderRadius: scale(32),
+  },
+  fabGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fabIcon: {
+    textShadowColor: "#00E5FF",
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 12,
+  },
+
+  // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    backgroundColor: ThemeColors.overlay,
     justifyContent: "center",
     alignItems: "center",
     padding: scale(20),
   },
   deleteModalContainer: {
-    width: "92%",
-    borderRadius: scale(24),
+    width: "90%",
+    maxWidth: scale(400),
+    borderRadius: scale(16),
     overflow: "hidden",
     elevation: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 15 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.5,
-    shadowRadius: 25,
+    shadowRadius: 20,
   },
   deleteModalGradient: {
-    padding: scale(35),
+    padding: scale(24),
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: ThemeColors.border,
   },
   deleteModalTitle: {
-    fontSize: scale(24),
-    fontWeight: "900",
+    fontSize: scale(20),
+    fontWeight: "700",
     color: ThemeColors.text,
-    marginBottom: scale(15),
-    marginTop: scale(15),
-    letterSpacing: 0.5,
+    marginTop: scale(16),
+    marginBottom: scale(8),
+    letterSpacing: -0.2,
   },
   deleteModalText: {
-    fontSize: scale(16),
+    fontSize: scale(15),
     color: ThemeColors.textSecondary,
     textAlign: "center",
-    marginBottom: scale(35),
-    lineHeight: scale(24),
+    lineHeight: scale(22),
+    marginBottom: scale(24),
   },
   deleteModalButtons: {
     flexDirection: "row",
-    gap: scale(15),
+    gap: scale(12),
     width: "100%",
   },
   deleteModalButton: {
     flex: 1,
-    borderRadius: scale(16),
+    borderRadius: scale(12),
     overflow: "hidden",
-    elevation: 5,
+    elevation: 3,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   modalButtonGradient: {
-    paddingVertical: scale(18),
+    paddingVertical: scale(16),
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   deleteModalButtonText: {
     color: ThemeColors.text,
     fontWeight: "600",
     fontSize: scale(16),
+    letterSpacing: 0.2,
   },
   deleteModalConfirmButtonText: {
     color: ThemeColors.text,
-    fontWeight: "800",
+    fontWeight: "700",
     fontSize: scale(16),
+    letterSpacing: 0.2,
   },
 
-  // Enhanced empty state styles
+  // Empty State
   emptyState: {
+    flex: 1,
+    marginTop: scale(40),
+    borderRadius: scale(20),
+    overflow: "hidden",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  emptyStateGradient: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: scale(60),
     paddingHorizontal: scale(30),
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
   emptyStateTitle: {
-    fontSize: scale(22),
+    fontSize: scale(20),
     fontWeight: "700",
-    color: ThemeColors.text,
-    marginTop: scale(20),
-    marginBottom: scale(10),
+    color: "#FFFFFF",
+    marginTop: scale(16),
+    marginBottom: scale(8),
+    letterSpacing: -0.2,
   },
   emptyStateText: {
-    fontSize: scale(16),
-    color: ThemeColors.textSecondary,
+    fontSize: scale(15),
+    color: "#B0B0B0",
     textAlign: "center",
-    lineHeight: scale(24),
-    marginBottom: scale(30),
+    lineHeight: scale(22),
+    marginBottom: scale(32),
   },
   emptyStateButton: {
-    borderRadius: scale(16),
+    borderRadius: scale(12),
     overflow: "hidden",
     elevation: 5,
-    shadowColor: ThemeColors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
+    shadowColor: "#00E5FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   emptyStateButtonGradient: {
-    paddingHorizontal: scale(30),
-    paddingVertical: scale(15),
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: scale(24),
+    paddingVertical: scale(14),
   },
   emptyStateButtonText: {
-    color: ThemeColors.text,
-    fontWeight: "700",
+    color: "#FFFFFF",
+    fontWeight: "600",
     fontSize: scale(16),
+    marginLeft: scale(8),
+    letterSpacing: 0.2,
   },
 });
 

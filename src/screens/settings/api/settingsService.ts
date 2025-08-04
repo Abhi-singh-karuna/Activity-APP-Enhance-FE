@@ -103,6 +103,11 @@ export interface DeleteAccountRequest {
   password?: string;
 }
 
+// Password verification interface
+export interface VerifyPasswordRequest {
+  password: string;
+}
+
 // Default color options for settings
 // export const DEFAULT_COLORS = [
 //   "#00E5FF", // Electric Blue
@@ -623,15 +628,36 @@ export const getUserInfo = async (): Promise<ApiResponse<UserInfo>> => {
   }
 };
 
-// Clear All Data API
-export const clearAllSettings = async (
-  data: ClearDataRequest
+// Password Verification API
+export const verifyPassword = async (
+  data: VerifyPasswordRequest
 ): Promise<ApiResponse> => {
   try {
     const response = await apiRequest({
       method: "POST",
-      url: "/settings/clear-all-data",
+      url: "/settings/verify-password",
       data,
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error verifying password:", error);
+    return {
+      status: false,
+      error: {
+        message: "Failed to verify password",
+        code: "VERIFY_PASSWORD_ERROR",
+      },
+    };
+  }
+};
+
+// Clear All Data API
+export const clearAllSettings = async (): Promise<ApiResponse> => {
+  try {
+    const response = await apiRequest({
+      method: "POST",
+      url: "/settings/clear-all-data",
     });
 
     return response;
@@ -648,14 +674,11 @@ export const clearAllSettings = async (
 };
 
 // Delete Account API
-export const deleteAccount = async (
-  data: DeleteAccountRequest
-): Promise<ApiResponse> => {
+export const deleteAccount = async (): Promise<ApiResponse> => {
   try {
     const response = await apiRequest({
-      method: "POST",
+      method: "DELETE",
       url: "/settings/delete-account",
-      data,
     });
 
     return response;
@@ -693,6 +716,9 @@ export const settingsService = {
 
   // User Info
   getUserInfo,
+
+  // Password verification
+  verifyPassword,
 
   // Bulk operations
   clearAllSettings,

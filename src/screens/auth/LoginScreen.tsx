@@ -43,7 +43,7 @@ const LoginScreen = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { fontSizeMultiplier, login: contextLogin } = useAppContext();
+  const { login: contextLogin } = useAppContext();
 
   // Toast state
   const [toastVisible, setToastVisible] = useState(false);
@@ -270,10 +270,7 @@ const LoginScreen = () => {
                       style={styles.inputIcon}
                     />
                     <TextInput
-                      style={[
-                        styles.input,
-                        { fontSize: scale(16) * fontSizeMultiplier },
-                      ]}
+                      style={styles.input}
                       placeholder="Enter your email"
                       placeholderTextColor="#666"
                       keyboardType="email-address"
@@ -314,10 +311,7 @@ const LoginScreen = () => {
                       style={styles.inputIcon}
                     />
                     <TextInput
-                      style={[
-                        styles.input,
-                        { fontSize: scale(16) * fontSizeMultiplier },
-                      ]}
+                      style={styles.input}
                       placeholder="Enter your password"
                       placeholderTextColor="#666"
                       secureTextEntry={!showPassword}

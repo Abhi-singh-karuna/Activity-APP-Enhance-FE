@@ -281,6 +281,7 @@ const SettingsScreen = () => {
   const [pendingAction, setPendingAction] = useState<"clear" | "delete" | null>(
     null
   );
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
 
   // Section toggle functions with improved animations
   const toggleCategoriesVisibility = useCallback(() => {
@@ -325,6 +326,7 @@ const SettingsScreen = () => {
       // Update state with API responses
       if (categoriesRes.status && categoriesRes.data) {
         setCategories(categoriesRes.data);
+        console.tron?.log("✅ Categories loaded:", categoriesRes.data.length);
       }
 
       if (skipReasonsRes.status && skipReasonsRes.data) {
@@ -746,11 +748,12 @@ const SettingsScreen = () => {
     setSelectedIcon(ICON_OPTIONS[0].name);
   }, []);
 
-  // Account management
+  // Account management with API password verification
   const handleClearAllData = useCallback(() => {
     showAlert({
       title: "Clear All Data",
-      message: "This will permanently delete all your settings. Continue?",
+      message:
+        "This will permanently delete all your settings, categories, priorities, and skip reasons. This action cannot be undone.",
       type: "warning",
       buttons: [
         { text: "Cancel", style: "cancel" },
@@ -769,7 +772,8 @@ const SettingsScreen = () => {
   const handleDeleteAccount = useCallback(() => {
     showAlert({
       title: "Delete Account",
-      message: "This will permanently delete your account. Continue?",
+      message:
+        "This will permanently delete your account and all associated data including settings, preferences, and user information. This action cannot be undone.",
       type: "error",
       buttons: [
         { text: "Cancel", style: "cancel" },
@@ -786,27 +790,49 @@ const SettingsScreen = () => {
   }, [showAlert]);
 
   const handlePasswordConfirm = useCallback(async () => {
-    // Simple password validation (in real app, this would be more secure)
-    const correctPassword = "password123";
-
-    if (password !== correctPassword) {
-      setPasswordError("Incorrect password. Please try again.");
+    if (!password.trim()) {
+      setPasswordError("Please enter your password.");
       return;
     }
 
     try {
+      setIsPasswordLoading(true);
+      setPasswordError("");
+
+      // Verify password with API
+      const passwordVerificationResponse = await settingsService.verifyPassword(
+        {
+          password: password.trim(),
+        }
+      );
+
+      if (!passwordVerificationResponse.status) {
+        setPasswordError(
+          passwordVerificationResponse.error?.message ||
+            "Invalid password. Please try again."
+        );
+        return;
+      }
+
+      // Password verified, proceed with the action
       if (pendingAction === "clear") {
         // Clear all data using API
-        const response = await settingsService.clearAllSettings({
-          password: password,
-        });
+        const response = await settingsService.clearAllSettings();
         if (response.status) {
+          // Clear local state
           setCategories([]);
           setSkipReasons([]);
           setPriorities([]);
+
+          // Close modal and show success
+          setPassword("");
+          setPasswordError("");
+          setPendingAction(null);
+          setShowPasswordModal(false);
+
           showAlert({
             title: "Success",
-            message: "All data has been cleared.",
+            message: "All data has been cleared successfully.",
             type: "success",
             buttons: [{ text: "OK" }],
           });
@@ -815,15 +841,21 @@ const SettingsScreen = () => {
         }
       } else if (pendingAction === "delete") {
         // Delete account using API
-        const response = await settingsService.deleteAccount({
-          password: password,
-        });
+        const response = await settingsService.deleteAccount();
         if (response.status) {
-          logout();
+          // Close modal first
+          setPassword("");
+          setPasswordError("");
+          setPendingAction(null);
+          setShowPasswordModal(false);
+
+          // Logout and navigate
+          await logout();
           navigation.navigate("Login");
+
           showAlert({
             title: "Account Deleted",
-            message: "Your account has been deleted.",
+            message: "Your account has been permanently deleted.",
             type: "info",
             buttons: [{ text: "OK" }],
           });
@@ -833,19 +865,11 @@ const SettingsScreen = () => {
           );
         }
       }
-
-      setPassword("");
-      setPasswordError("");
-      setPendingAction(null);
-      setShowPasswordModal(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to perform action:", error);
-      showAlert({
-        title: "Error",
-        message: "Failed to perform action. Please try again.",
-        type: "error",
-        buttons: [{ text: "OK" }],
-      });
+      setPasswordError(error.message || "An error occurred. Please try again.");
+    } finally {
+      setIsPasswordLoading(false);
     }
   }, [password, pendingAction, logout, navigation, showAlert]);
 
@@ -1411,7 +1435,7 @@ const SettingsScreen = () => {
                       </View>
                       <View style={styles.accountDetails}>
                         <Text style={styles.accountName}>
-                          {userInfo?.name || "User Account"} 
+                          {userInfo?.name || "User Account"}
                         </Text>
                         <Text style={styles.accountEmail}>
                           {userInfo?.email || "user@example.com"}
@@ -1423,7 +1447,6 @@ const SettingsScreen = () => {
                             color={ThemeColors.success}
                           />{" "}
                           {userInfo?.status || "Active"}
-                          
                         </Text>
                       </View>
                     </View>
@@ -1675,14 +1698,30 @@ const SettingsScreen = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Password Confirmation Modal */}
+      {/* Enhanced Password Confirmation Modal */}
       <Modal
         visible={showPasswordModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowPasswordModal(false)}
+        onRequestClose={() => {
+          if (!isPasswordLoading) {
+            setShowPasswordModal(false);
+            setPassword("");
+            setPasswordError("");
+            setPendingAction(null);
+          }
+        }}
       >
-        <TouchableWithoutFeedback onPress={() => setShowPasswordModal(false)}>
+        <TouchableWithoutFeedback
+          onPress={() => {
+            if (!isPasswordLoading) {
+              setShowPasswordModal(false);
+              setPassword("");
+              setPasswordError("");
+              setPendingAction(null);
+            }
+          }}
+        >
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <View style={styles.modalContainer}>
@@ -1691,13 +1730,15 @@ const SettingsScreen = () => {
                   style={styles.modalGradient}
                 >
                   <Icon
-                    name="lock-closed-outline"
+                    name="lock-closed"
                     size={scale(48)}
                     color={ThemeColors.danger}
                   />
                   <Text style={styles.modalTitle}>Confirm Password</Text>
                   <Text style={styles.passwordDescription}>
-                    Please enter your password to confirm this action
+                    {pendingAction === "clear"
+                      ? "Enter your password to clear all data"
+                      : "Enter your password to delete your account"}
                   </Text>
 
                   <View style={styles.modalInputContainer}>
@@ -1715,6 +1756,7 @@ const SettingsScreen = () => {
                       }}
                       secureTextEntry={true}
                       autoFocus={true}
+                      editable={!isPasswordLoading}
                     />
                     {passwordError ? (
                       <Text style={styles.errorText}>{passwordError}</Text>
@@ -1725,17 +1767,24 @@ const SettingsScreen = () => {
                     <TouchableOpacity
                       style={styles.modalButton}
                       onPress={() => {
-                        setShowPasswordModal(false);
-                        setPassword("");
-                        setPasswordError("");
+                        if (!isPasswordLoading) {
+                          setShowPasswordModal(false);
+                          setPassword("");
+                          setPasswordError("");
+                          setPendingAction(null);
+                        }
                       }}
+                      disabled={isPasswordLoading}
                     >
                       <LinearGradient
                         colors={[
                           "rgba(128, 128, 128, 0.3)",
                           "rgba(128, 128, 128, 0.1)",
                         ]}
-                        style={styles.modalButtonGradient}
+                        style={[
+                          styles.modalButtonGradient,
+                          isPasswordLoading && styles.disabledButton,
+                        ]}
                       >
                         <Text style={styles.modalButtonText}>Cancel</Text>
                       </LinearGradient>
@@ -1743,16 +1792,25 @@ const SettingsScreen = () => {
                     <TouchableOpacity
                       style={styles.modalButton}
                       onPress={handlePasswordConfirm}
-                      disabled={!password.trim()}
+                      disabled={!password.trim() || isPasswordLoading}
                     >
                       <LinearGradient
                         colors={["#FF4757", "#FF6B81"]}
                         style={[
                           styles.modalButtonGradient,
-                          !password.trim() && styles.disabledButton,
+                          (!password.trim() || isPasswordLoading) &&
+                            styles.disabledButton,
                         ]}
                       >
-                        <Text style={styles.modalButtonText}>Confirm</Text>
+                        {isPasswordLoading ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={styles.modalButtonText}>
+                            {pendingAction === "clear"
+                              ? "Clear Data"
+                              : "Delete Account"}
+                          </Text>
+                        )}
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
@@ -1855,7 +1913,7 @@ const customAlertStyles = StyleSheet.create({
   },
 });
 
-// Main improved styles
+// Main improved styles with FIXED delete icon alignment
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -2002,7 +2060,7 @@ const styles = StyleSheet.create({
   },
   sectionContent: {
     paddingHorizontal: scale(18),
-    paddingTop: scale(14), // Added top padding for first card spacing
+    paddingTop: scale(14),
     paddingBottom: scale(18),
   },
   settingsList: {
@@ -2067,12 +2125,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: scale(8),
   },
+  // FIXED: Delete icon alignment issue
   actionButton: {
     width: scale(30),
     height: scale(30),
     borderRadius: scale(15),
     justifyContent: "center",
-    alignItems: "center",
+    alignItems: "center", // This ensures perfect centering
     borderWidth: 1,
   },
   editButton: {
@@ -2403,6 +2462,8 @@ const styles = StyleSheet.create({
     paddingVertical: scale(16),
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: scale(8),
   },
   modalButtonText: {
     color: "#fff",
@@ -2422,6 +2483,7 @@ const styles = StyleSheet.create({
     fontSize: scale(14),
     textAlign: "center",
     marginBottom: scale(20),
+    lineHeight: scale(20),
   },
   disabledButton: {
     opacity: 0.5,

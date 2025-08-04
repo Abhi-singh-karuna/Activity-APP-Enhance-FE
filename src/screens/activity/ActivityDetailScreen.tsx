@@ -13,606 +13,547 @@ import {
   SafeAreaView,
   Text,
   Animated,
+  Platform,
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { RootStackParamList } from "../../navigation";
-import StyledText from "../../components/StyledText";
-import Svg, { Path } from "react-native-svg";
+import { Activity, Category } from "../../types";
 
 // Get device dimensions for responsive design
 const { width, height } = Dimensions.get("window");
+const isSmallDevice = width < 375;
+
+// Responsive scaling
+const scale = (size: number) => {
+  if (isSmallDevice) return size * 0.9;
+  return size;
+};
 
 // Type definitions
 type ActivityDetailRouteProp = RouteProp<RootStackParamList, "ActivityDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type Interruption = {
-  StartTime: string;
-  CoverdTime: string;
-  id?: string;
-  timeInMillis?: number;
-};
-
-type ActivityData = {
+// Enhanced activity data structure
+interface EnhancedActivityData {
   id: string;
   title: string;
-  category: string;
+  category: Category;
   startDate: string;
   endDate: string;
-  activityDuration: string;
+  duration: string;
   color: string;
-  interuption: Interruption[];
-  remainingActivityTime: string;
+  priority: number;
+  isRunning: boolean;
+  isCompleted: boolean;
+  isPaused: boolean;
+  isFuture: boolean;
+  currentTimer: string;
+  remainingSeconds: number;
+  elapsedSeconds: number;
+  totalTimeSpent: number;
+  completionPercentage: number;
+  streak: number;
+  lastStartTime?: number;
+  lastCompletedDate?: string;
+  description?: string;
+  tags: string[];
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Interaction history type
+interface InteractionHistory {
+  id: string;
+  type:
+    | "started"
+    | "paused"
+    | "resumed"
+    | "completed"
+    | "edited"
+    | "interrupted";
+  timestamp: string;
+  duration?: string;
+  note?: string;
+}
+
+// Streak history type
+interface StreakHistory {
+  date: string;
+  streak: number;
+  completed: boolean;
+  timeSpent: number;
+}
+
+// Theme colors
+const ThemeColors = {
+  primary: "#00E5FF",
+  secondary: "#9C6CDA",
+  success: "#4ECDC4",
+  warning: "#FF9500",
+  danger: "#FF4757",
+  background: "#000000",
+  surface: "#121212",
+  card: "#1E1E1E",
+  cardSecondary: "#2C2C2E",
+  text: "#FFFFFF",
+  textSecondary: "#B0B0B0",
+  textTertiary: "#808080",
+  textMuted: "#666666",
+  border: "rgba(255, 255, 255, 0.1)",
+  overlay: "rgba(0, 0, 0, 0.8)",
 };
 
-type TimerStatus = "running" | "paused" | "completed" | "interrupted";
-
 /**
- * Custom hook for creating SVG arcs for the timer visualization
- * Generates SVG path data for arc segments based on angles and dimensions
- */
-const useArcPath = () => {
-  const getArcPath = (
-    startAngle: number,
-    endAngle: number,
-    radius: number,
-    thickness: number
-  ) => {
-    // Convert angles from degrees to radians
-    const startRad = (startAngle - 90) * (Math.PI / 180);
-    const endRad = (endAngle - 90) * (Math.PI / 180);
-
-    // Calculate coordinates
-    const x1 = radius + radius * Math.cos(startRad);
-    const y1 = radius + radius * Math.sin(startRad);
-    const x2 = radius + radius * Math.cos(endRad);
-    const y2 = radius + radius * Math.sin(endRad);
-
-    // Inner radius
-    const innerRadius = radius - thickness;
-    const x3 = radius + innerRadius * Math.cos(endRad);
-    const y3 = radius + innerRadius * Math.sin(endRad);
-    const x4 = radius + innerRadius * Math.cos(startRad);
-    const y4 = radius + innerRadius * Math.sin(startRad);
-
-    // Determine if we need to draw more than 180 degrees
-    const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
-
-    // Build the path
-    return [
-      `M ${x1} ${y1}`, // Move to start point
-      `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`, // Outer arc
-      `L ${x3} ${y3}`, // Line to inner arc start
-      `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${x4} ${y4}`, // Inner arc
-      "Z", // Close path
-    ].join(" ");
-  };
-
-  return getArcPath;
-};
-
-/**
- * ActivityDetailScreen - Displays detailed information about an activity with timer functionality
- * Features include:
- * - Circular timer visualization with SVG arcs
- * - Timer controls (start, pause, interrupt)
- * - Interruption tracking
- * - Tag management
+ * ActivityDetailScreen - Production-level activity detail view
+ * Features:
+ * - Comprehensive activity information
+ * - Interaction history tracking
+ * - Streak visualization and history
+ * - Edit/Delete functionality
+ * - Modern, clean design
  */
 const ActivityDetailScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ActivityDetailRouteProp>();
   const { title, category, isPersonal } = route.params;
 
-  // Mock activity data - in real app this would come from props or API
-  const [activityData, setActivityData] = useState<ActivityData>({
-    id: "1",
-    title: title || "Gym",
-    category: category || "Personal",
-    startDate: "2022/02/03",
-    endDate: "2022/02/05",
-    activityDuration: "01:30:00",
+  // Enhanced activity data with dummy data
+  const [activityData, setActivityData] = useState<EnhancedActivityData>({
+    id: "activity_123",
+    title: title || "Morning Workout",
+    category: (category as Category) || "Workout",
+    startDate: "2025/08/02",
+    endDate: "2025/08/02",
+    duration: "01:00:00",
     color: "#00E5FF",
-    interuption: [
-      {
-        StartTime: "10:10:00",
-        CoverdTime: "00:20:00",
-      },
-      {
-        StartTime: "13:30:00",
-        CoverdTime: "00:30:00",
-      },
-    ],
-    remainingActivityTime: "00:40:00",
+    priority: 1,
+    isRunning: true,
+    isCompleted: false,
+    isPaused: false,
+    isFuture: false,
+    currentTimer: "00:45:30",
+    remainingSeconds: 2730,
+    elapsedSeconds: 870,
+    totalTimeSpent: 870,
+    completionPercentage: 25,
+    streak: 7,
+    lastStartTime: Date.now() - 870000,
+    description:
+      "Complete morning workout routine including cardio and strength training",
+    tags: ["Cardio", "Strength", "Morning"],
+    notes: "Focus on form and breathing. Take breaks as needed.",
+    createdAt: "2025-01-01T00:00:00Z",
+    updatedAt: "2025-01-01T00:00:00Z",
   });
 
-  // Timer state management
-  const [timerStatus, setTimerStatus] = useState<TimerStatus>("paused");
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [remainingTime, setRemainingTime] = useState(0);
-  const [activityTotalDuration, setActivityTotalDuration] = useState(0);
-  const [currentInterruption, setCurrentInterruption] =
-    useState<Interruption | null>(null);
-  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
-
-  // Reference to store timer interval
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number | null>(null);
-
-  // Tags management
-  const [tags, setTags] = useState<
-    { id: string; name: string; icon: string }[]
+  // Interaction history
+  const [interactionHistory, setInteractionHistory] = useState<
+    InteractionHistory[]
   >([
-    { id: "1", name: "Research", icon: "search-outline" },
-    { id: "2", name: "UI", icon: "apps-outline" },
-    { id: "3", name: "UX", icon: "color-palette-outline" },
+    {
+      id: "1",
+      type: "started",
+      timestamp: "2025-08-02T08:00:00Z",
+      duration: "00:45:30",
+      note: "Started morning workout session",
+    },
+    {
+      id: "2",
+      type: "paused",
+      timestamp: "2025-08-02T08:15:00Z",
+      duration: "00:15:00",
+      note: "Quick water break",
+    },
+    {
+      id: "3",
+      type: "resumed",
+      timestamp: "2025-08-02T08:17:00Z",
+      duration: "00:30:30",
+      note: "Resumed after break",
+    },
+    {
+      id: "4",
+      type: "interrupted",
+      timestamp: "2025-08-02T08:30:00Z",
+      duration: "00:05:00",
+      note: "Phone call interruption",
+    },
+    {
+      id: "5",
+      type: "resumed",
+      timestamp: "2025-08-02T08:35:00Z",
+      duration: "00:10:30",
+      note: "Back to workout",
+    },
   ]);
+
+  // Streak history
+  const [streakHistory, setStreakHistory] = useState<StreakHistory[]>([
+    { date: "2025-08-01", streak: 6, completed: true, timeSpent: 3600 },
+    { date: "2025-07-31", streak: 5, completed: true, timeSpent: 3300 },
+    { date: "2025-07-30", streak: 4, completed: true, timeSpent: 3000 },
+    { date: "2025-07-29", streak: 3, completed: true, timeSpent: 2700 },
+    { date: "2025-07-28", streak: 2, completed: true, timeSpent: 2400 },
+    { date: "2025-07-27", streak: 1, completed: true, timeSpent: 2100 },
+    { date: "2025-07-26", streak: 0, completed: false, timeSpent: 0 },
+  ]);
+
+  // UI State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
-  const [newTagName, setNewTagName] = useState("");
-  const [selectedIcon, setSelectedIcon] = useState("pricetag-outline");
+  const [activeTab, setActiveTab] = useState<"overview" | "history" | "streak">(
+    "overview"
+  );
 
-  // Animation value for timer pulsing effect
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    title: activityData.title,
+    category: activityData.category,
+    description: activityData.description || "",
+    notes: activityData.notes,
+    priority: activityData.priority,
+    color: activityData.color,
+  });
 
-  // Use our custom hook for SVG arcs
-  const getArcPath = useArcPath();
+  // Animation refs
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const modalScaleAnim = useRef(new Animated.Value(0.3)).current;
+  const modalOpacityAnim = useRef(new Animated.Value(0)).current;
 
-  // Timer dimensions
-  const timerSize = Math.min(width * 0.75, 300);
-  const timerRadius = timerSize / 2;
-  const timerThickness = 16;
-  const timerInnerOffset = 4; // Space between border and colored segments
-
-  // Initialize timer values from activity data
+  // Initialize animations
   useEffect(() => {
-    const activityDurationMillis = timeStringToMillis(
-      activityData.activityDuration
-    );
-    const remainingTimeMillis = timeStringToMillis(
-      activityData.remainingActivityTime
-    );
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 80,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
-    setActivityTotalDuration(activityDurationMillis);
-    setRemainingTime(remainingTimeMillis);
+  // Helper function to render streak stars
+  const renderStreakStars = (streak: number, size: number = 12) => {
+    const maxStars = 7;
+    const starsToShow = Math.min(streak, maxStars);
+    const stars = [];
 
-    // Process interruptions to add millisecond values and ensure unique IDs
-    const processedInterruptions = activityData.interuption.map(
-      (interruption, index) => ({
-        ...interruption,
-        id: interruption.id || `interruption-${index}-${Date.now()}`,
-        timeInMillis: timeStringToMillis(interruption.CoverdTime),
-      })
-    );
+    for (let i = 0; i < maxStars; i++) {
+      const isFilled = i < starsToShow;
+      const isSpecial = i === 6 && streak > maxStars;
+
+      stars.push(
+        <View key={i} style={styles.streakStarContainer}>
+          <Icon
+            name={isFilled ? "star" : "star-outline"}
+            size={scale(size)}
+            color={
+              isSpecial
+                ? "#FFD700"
+                : isFilled
+                ? "#FFD700"
+                : "rgba(255, 215, 0, 0.3)"
+            }
+          />
+          {isSpecial && (
+            <Text style={styles.streakOverflowText}>+{streak - maxStars}</Text>
+          )}
+        </View>
+      );
+    }
+
+    return stars;
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  // Format time for display
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  // Get interaction icon
+  const getInteractionIcon = (type: InteractionHistory["type"]) => {
+    switch (type) {
+      case "started":
+        return "play-circle";
+      case "paused":
+        return "pause-circle";
+      case "resumed":
+        return "play";
+      case "completed":
+        return "checkmark-circle";
+      case "edited":
+        return "create";
+      case "interrupted":
+        return "hand-right";
+      default:
+        return "time";
+    }
+  };
+
+  // Get interaction color
+  const getInteractionColor = (type: InteractionHistory["type"]) => {
+    switch (type) {
+      case "started":
+        return ThemeColors.success;
+      case "paused":
+        return ThemeColors.warning;
+      case "resumed":
+        return ThemeColors.primary;
+      case "completed":
+        return ThemeColors.success;
+      case "edited":
+        return ThemeColors.secondary;
+      case "interrupted":
+        return ThemeColors.danger;
+      default:
+        return ThemeColors.textSecondary;
+    }
+  };
+
+  // Handle edit activity
+  const handleEditActivity = () => {
+    setActivityData({
+      ...activityData,
+      ...editForm,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Add to interaction history
+    const newInteraction: InteractionHistory = {
+      id: Date.now().toString(),
+      type: "edited",
+      timestamp: new Date().toISOString(),
+      note: "Activity details updated",
+    };
+
+    setInteractionHistory([newInteraction, ...interactionHistory]);
+    setShowEditModal(false);
+  };
+
+  // Handle delete activity
+  const handleDeleteActivity = () => {
+    // In real app, call API to delete
+    navigation.goBack();
+  };
+
+  // Handle timer toggle
+  const handleTimerToggle = () => {
+    const newIsRunning = !activityData.isRunning;
+    const newStatus = newIsRunning ? "started" : "paused";
 
     setActivityData({
       ...activityData,
-      interuption: processedInterruptions,
+      isRunning: newIsRunning,
+      lastStartTime: newIsRunning ? Date.now() : undefined,
     });
-  }, []);
 
-  /**
-   * Calculate segment angles for the timer visualization
-   * @returns Object containing start and end angles for interruption and remaining time
-   */
-  const calculateArcAngles = () => {
-    // Calculate the percentages
-    const interruptionPercentage = calculateInterruptionPercentage();
-    const remainingPercentage = calculateRemainingPercentage();
-
-    // Convert percentages to angles (360 degrees total)
-    const interruptionAngle = (interruptionPercentage / 100) * 360;
-    const remainingAngle = (remainingPercentage / 100) * 360;
-
-    return {
-      interruptionStart: 0,
-      interruptionEnd: interruptionAngle,
-      remainingStart: interruptionAngle,
-      remainingEnd: interruptionAngle + remainingAngle,
+    // Add to interaction history
+    const newInteraction: InteractionHistory = {
+      id: Date.now().toString(),
+      type: newStatus as any,
+      timestamp: new Date().toISOString(),
+      duration: activityData.currentTimer,
+      note: newIsRunning ? "Activity started" : "Activity paused",
     };
+
+    setInteractionHistory([newInteraction, ...interactionHistory]);
   };
 
-  /**
-   * Convert time string "HH:MM:SS" to milliseconds
-   */
-  const timeStringToMillis = (timeString: string): number => {
-    const [hours, minutes, seconds] = timeString.split(":").map(Number);
-    return (hours * 60 * 60 + minutes * 60 + seconds) * 1000;
+  // Show edit modal
+  const showEditModalWithAnimation = () => {
+    setShowEditModal(true);
+    Animated.parallel([
+      Animated.spring(modalScaleAnim, {
+        toValue: 1,
+        tension: 100,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalOpacityAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
-  /**
-   * Format time for display (convert milliseconds to MM:SS)
-   */
-  const formatDisplayTime = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, "0")}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
+  // Hide edit modal
+  const hideEditModal = () => {
+    Animated.parallel([
+      Animated.spring(modalScaleAnim, {
+        toValue: 0.3,
+        tension: 100,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalOpacityAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowEditModal(false);
+    });
   };
-
-  /**
-   * Format time for display (convert milliseconds to HH:MM:SS or MM:SS)
-   */
-  const formatFullTime = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes.toString().padStart(2, "0")}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
-  };
-
-  /**
-   * Calculate the total duration of all interruptions
-   */
-  const getInterruptionsTotalDuration = () => {
-    return activityData.interuption.reduce((total, interruption) => {
-      const duration = interruption.timeInMillis || 0;
-      return total + duration;
-    }, 0);
-  };
-
-  /**
-   * Calculate the progress percentage (0-100)
-   */
-  const calculateProgress = () => {
-    if (activityTotalDuration === 0) return 0;
-    const completed = activityTotalDuration - remainingTime;
-    return Math.min(100, (completed / activityTotalDuration) * 100);
-  };
-
-  /**
-   * Calculate the interruption percentage (0-100)
-   */
-  const calculateInterruptionPercentage = () => {
-    if (activityTotalDuration === 0) return 0;
-    return Math.min(
-      100,
-      (getInterruptionsTotalDuration() / activityTotalDuration) * 100
-    );
-  };
-
-  /**
-   * Calculate the remaining percentage (0-100)
-   */
-  const calculateRemainingPercentage = () => {
-    if (activityTotalDuration === 0) return 0;
-    return Math.min(100, (remainingTime / activityTotalDuration) * 100);
-  };
-
-  /**
-   * Calculate the completed percentage (0-100)
-   */
-  const calculateCompletedPercentage = () => {
-    if (activityTotalDuration === 0) return 0;
-    const interruptionPercentage = calculateInterruptionPercentage();
-    const remainingPercentage = calculateRemainingPercentage();
-    return Math.max(0, 100 - interruptionPercentage - remainingPercentage);
-  };
-
-  // Helper function to get the correct timer color
-  const getTimerColor = () => {
-    if (timerStatus === "completed") {
-      return "#4CAF50"; // Green for completed
-    } else if (timerStatus === "interrupted") {
-      return "#F44336"; // Red for interruptions
-    } else {
-      return activityData.color; // Default color from activity data
-    }
-  };
-
-  /**
-   * Start the timer
-   * Begins countdown from remaining time
-   */
-  const startTimer = () => {
-    if (timerStatus !== "running" && remainingTime > 0) {
-      const now = Date.now();
-      startTimeRef.current = now;
-
-      timerRef.current = setInterval(() => {
-        if (startTimeRef.current) {
-          const elapsed = Date.now() - startTimeRef.current;
-          setElapsedTime(elapsed);
-
-          const newRemainingTime = Math.max(0, remainingTime - elapsed);
-          setRemainingTime(newRemainingTime);
-
-          // Check if timer is completed
-          if (newRemainingTime <= 0) {
-            completeTimer();
-          }
-        }
-      }, 1000);
-
-      setTimerStatus("running");
-    }
-  };
-
-  /**
-   * Pause the timer
-   * Stops countdown and updates remaining time
-   */
-  const pauseTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (startTimeRef.current) {
-      const elapsed = Date.now() - startTimeRef.current;
-      setRemainingTime((prev) => Math.max(0, prev - elapsed));
-      startTimeRef.current = null;
-    }
-
-    setTimerStatus("paused");
-    setElapsedTime(0);
-  };
-
-  /**
-   * Toggle timer between start/pause/resume
-   */
-  const toggleTimer = () => {
-    if (timerStatus === "running") {
-      pauseTimer();
-    } else if (timerStatus === "interrupted") {
-      endInterruption();
-    } else if (remainingTime > 0) {
-      startTimer();
-    }
-  };
-
-  /**
-   * Complete the timer
-   * Shows completion message and alerts user
-   */
-  const completeTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    setTimerStatus("completed");
-    setRemainingTime(0);
-    setShowCompletionMessage(true);
-
-    // In a real app, you would save completion status to database
-    Alert.alert(
-      "Activity Completed!",
-      "Congratulations on completing your activity for today!"
-    );
-  };
-
-  /**
-   * Start an interruption
-   * Pauses timer and creates new interruption record
-   */
-  const startInterruption = () => {
-    if (timerStatus === "running") {
-      pauseTimer();
-
-      const newInterruption: Interruption = {
-        StartTime: new Date().toLocaleTimeString(),
-        CoverdTime: "00:00:00",
-        id: Date.now().toString(),
-        timeInMillis: 0,
-      };
-
-      setCurrentInterruption(newInterruption);
-      setTimerStatus("interrupted");
-    }
-  };
-
-  /**
-   * End an interruption
-   * Records duration and adds to interruption list
-   */
-  const endInterruption = () => {
-    if (currentInterruption && timerStatus === "interrupted") {
-      const interruptionDuration =
-        Date.now() - (startTimeRef.current || Date.now());
-      const coveredTimeMillis = Math.max(1000, interruptionDuration); // Minimum 1 second
-
-      const updatedInterruption: Interruption = {
-        ...currentInterruption,
-        CoverdTime: formatFullTime(coveredTimeMillis),
-        timeInMillis: coveredTimeMillis,
-      };
-
-      // Add to interruptions list
-      const updatedInterruptions = [
-        ...activityData.interuption,
-        updatedInterruption,
-      ];
-
-      setActivityData({
-        ...activityData,
-        interuption: updatedInterruptions,
-      });
-
-      setCurrentInterruption(null);
-      setTimerStatus("paused");
-
-      // Reset timer start for next session
-      startTimeRef.current = null;
-    }
-  };
-
-  // Delete activity confirmation
-  const confirmDelete = () => {
-    Alert.alert(
-      "Delete Activity",
-      "Are you sure you want to delete this activity?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            // Delete logic would go here
-            navigation.goBack();
-          },
-        },
-      ]
-    );
-  };
-
-  /**
-   * Tag management - Add a new tag
-   */
-  const addTag = () => {
-    if (newTagName.trim()) {
-      const newTag = {
-        id: Date.now().toString(),
-        name: newTagName.trim(),
-        icon: selectedIcon,
-      };
-
-      setTags([...tags, newTag]);
-      setNewTagName("");
-      setSelectedIcon("pricetag-outline");
-      setShowTagModal(false);
-    }
-  };
-
-  /**
-   * Tag management - Remove a tag
-   */
-  const removeTag = (id: string) => {
-    setTags(tags.filter((tag) => tag.id !== id));
-  };
-
-  // Icon selection options
-  const iconOptions = [
-    "pricetag-outline",
-    "leaf-outline",
-    "bulb-outline",
-    "book-outline",
-    "briefcase-outline",
-    "cafe-outline",
-    "code-outline",
-    "desktop-outline",
-    "game-controller-outline",
-    "fitness-outline",
-    "home-outline",
-    "medical-outline",
-  ];
-
-  /**
-   * Calculate positions for minute markers around the timer
-   */
-  const getMinuteLabelPosition = (minute: number, totalDuration: number) => {
-    // Calculate the angle based on the percentage of total duration
-    // 0% is at the top, 50% at the bottom, so we need to adjust
-    const angleInRadians = (minute / totalDuration) * 2 * Math.PI - Math.PI / 2;
-
-    // Timer radius (adjust based on your timerOuterRing size)
-    const radius = width * 0.3 - 30; // Slightly inside the outer ring
-
-    // Calculate x and y coordinates based on the angle
-    const x = Math.cos(angleInRadians) * radius;
-    const y = Math.sin(angleInRadians) * radius;
-
-    return {
-      position: "absolute" as const,
-      transform: [{ translateX: x }, { translateY: y }],
-      textAlign: "center" as const,
-      width: 30,
-      left: "50%" as any,
-      top: "50%" as any,
-      marginLeft: -15,
-      marginTop: -10,
-    };
-  };
-
-  /**
-   * Calculate markers for the timer based on total activity duration
-   */
-  const getTimerMarkers = () => {
-    const totalMinutes = Math.ceil(activityTotalDuration / (60 * 1000));
-    const markers = [];
-    const numMarkers = 12; // We want 12 markers around the timer
-
-    for (let i = 0; i < numMarkers; i++) {
-      const percentage = i / numMarkers;
-      const minutes = Math.round(percentage * totalMinutes);
-      markers.push({
-        value: minutes,
-        percentage: percentage * totalMinutes,
-        isLarge: i % 3 === 0, // Make every 3rd marker larger
-      });
-    }
-
-    return markers;
-  };
-
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, []);
-
-  // Setup pulse animation when timer is running
-  useEffect(() => {
-    let pulseAnimation: Animated.CompositeAnimation;
-
-    if (timerStatus === "running") {
-      // Create pulsing animation
-      pulseAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 0.7,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-      // Start the animation
-      pulseAnimation.start();
-    } else {
-      // Reset opacity when timer is not running
-      pulseAnim.setValue(1);
-    }
-
-    // Clean up animation on state change
-    return () => {
-      if (pulseAnimation) {
-        pulseAnimation.stop();
-      }
-    };
-  }, [timerStatus, pulseAnim]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="chevron-back" size={24} color="#fff" />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={ThemeColors.background}
+      />
+
+      {/* Header */}
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerButton}
+        >
+          <Icon name="chevron-back" size={scale(24)} color={ThemeColors.text} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.headerTitle}>Done</Text>
+
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Activity Details</Text>
+          <Text style={styles.headerSubtitle}>{activityData.title}</Text>
+        </View>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={showEditModalWithAnimation}
+            style={styles.headerButton}
+          >
+            <Icon
+              name="create-outline"
+              size={scale(20)}
+              color={ThemeColors.primary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowDeleteModal(true)}
+            style={styles.headerButton}
+          >
+            <Icon
+              name="trash-outline"
+              size={scale(20)}
+              color={ThemeColors.danger}
+            />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "overview" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("overview")}
+        >
+          <Icon
+            name="information-circle-outline"
+            size={scale(16)}
+            color={
+              activeTab === "overview"
+                ? ThemeColors.primary
+                : ThemeColors.textSecondary
+            }
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "overview" && styles.activeTabText,
+            ]}
+          >
+            Overview
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={confirmDelete}>
-          <Icon name="trash-outline" size={20} color="#fff" />
+
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "history" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("history")}
+        >
+          <Icon
+            name="time-outline"
+            size={scale(16)}
+            color={
+              activeTab === "history"
+                ? ThemeColors.primary
+                : ThemeColors.textSecondary
+            }
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "history" && styles.activeTabText,
+            ]}
+          >
+            History
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "streak" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("streak")}
+        >
+          <Icon
+            name="star-outline"
+            size={scale(16)}
+            color={
+              activeTab === "streak"
+                ? ThemeColors.primary
+                : ThemeColors.textSecondary
+            }
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "streak" && styles.activeTabText,
+            ]}
+          >
+            Streak
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -621,329 +562,514 @@ const ActivityDetailScreen = () => {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{activityData.title}</Text>
-          <Text style={styles.category}>{activityData.category}</Text>
-        </View>
+        {/* Overview Tab */}
+        {activeTab === "overview" && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            {/* Activity Status Card */}
+            <View style={styles.statusCard}>
+              <LinearGradient
+                colors={[activityData.color + "20", activityData.color + "10"]}
+                style={styles.statusCardGradient}
+              >
+                <View style={styles.statusHeader}>
+                  <View style={styles.statusInfo}>
+                    <Text style={styles.statusTitle}>{activityData.title}</Text>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusBadgeText}>
+                        {activityData.category.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.statusIcon}>
+                    <Icon
+                      name={
+                        activityData.isCompleted
+                          ? "checkmark-circle"
+                          : activityData.isRunning
+                          ? "play-circle"
+                          : "pause-circle"
+                      }
+                      size={scale(32)}
+                      color={
+                        activityData.isCompleted
+                          ? ThemeColors.success
+                          : activityData.isRunning
+                          ? ThemeColors.primary
+                          : ThemeColors.warning
+                      }
+                    />
+                  </View>
+                </View>
 
-        <View style={styles.tagsContainer}>
-          {tags.map((tag, index) => (
-            <View key={`tag-${tag.id}-${index}`} style={styles.tag}>
-              <Icon name={tag.icon} size={14} color="#fff" />
-              <Text style={styles.tagText}>{tag.name}</Text>
-              <TouchableOpacity onPress={() => removeTag(tag.id)}>
-                <Icon name="close" size={14} color="#fff" />
-              </TouchableOpacity>
+                <View style={styles.statusDetails}>
+                  <View style={styles.statusItem}>
+                    <Text style={styles.statusLabel}>Current Status</Text>
+                    <Text style={styles.statusValue}>
+                      {activityData.isCompleted
+                        ? "Completed"
+                        : activityData.isRunning
+                        ? "Running"
+                        : "Paused"}
+                    </Text>
+                  </View>
+
+                  <View style={styles.statusItem}>
+                    <Text style={styles.statusLabel}>Progress</Text>
+                    <Text style={styles.statusValue}>
+                      {activityData.completionPercentage}%
+                    </Text>
+                  </View>
+
+                  <View style={styles.statusItem}>
+                    <Text style={styles.statusLabel}>Current Streak</Text>
+                    <View style={styles.streakDisplay}>
+                      {renderStreakStars(activityData.streak, 14)}
+                    </View>
+                  </View>
+                </View>
+              </LinearGradient>
             </View>
-          ))}
-          <TouchableOpacity
-            style={styles.addTagButton}
-            onPress={() => setShowTagModal(true)}
-          >
-            <Text style={styles.addTagText}>+ADD</Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.statsSection}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Total Time</Text>
-            <Text style={styles.statValue}>
-              {formatFullTime(activityTotalDuration)}
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Remaining</Text>
-            <Text style={styles.statValue}>
-              {formatFullTime(remainingTime)}
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Interruptions</Text>
-            <Text style={styles.statValue}>
-              {activityData.interuption.length}
-            </Text>
-          </View>
-        </View>
+            {/* Timer Controls */}
+            {!activityData.isCompleted && (
+              <View style={styles.timerCard}>
+                <View style={styles.timerHeader}>
+                  <Text style={styles.timerTitle}>Timer</Text>
+                  <Text style={styles.timerValue}>
+                    {activityData.currentTimer}
+                  </Text>
+                </View>
 
-        <View style={styles.timerSection}>
-          <Animated.Text
-            style={[
-              styles.timerValue,
-              timerStatus === "completed" && styles.completedTimerValue,
-              { opacity: timerStatus === "running" ? pulseAnim : 1 },
-            ]}
-          >
-            {formatFullTime(remainingTime)}
-          </Animated.Text>
-          <Text style={styles.timerSubtext}>
-            {timerStatus === "completed"
-              ? "Completed!"
-              : timerStatus === "interrupted"
-              ? "Interruption in progress..."
-              : `${formatFullTime(
-                  activityTotalDuration - remainingTime
-                )} of ${formatFullTime(activityTotalDuration)}`}
-          </Text>
-        </View>
+                <View style={styles.timerControls}>
+                  <TouchableOpacity
+                    style={[
+                      styles.timerButton,
+                      activityData.isRunning && styles.activeTimerButton,
+                    ]}
+                    onPress={handleTimerToggle}
+                  >
+                    <Icon
+                      name={activityData.isRunning ? "pause" : "play"}
+                      size={scale(20)}
+                      color={ThemeColors.text}
+                    />
+                    <Text style={styles.timerButtonText}>
+                      {activityData.isRunning ? "Pause" : "Start"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
-        {showCompletionMessage && (
-          <View style={styles.completionContainer}>
-            <Icon name="checkmark-circle" size={40} color="#4CAF50" />
-            <Text style={styles.completionText}>
-              Congratulations! Activity completed for today.
-            </Text>
-          </View>
+            {/* Activity Details */}
+            <View style={styles.detailsCard}>
+              <Text style={styles.sectionTitle}>Activity Details</Text>
+
+              <View style={styles.detailRow}>
+                <Icon
+                  name="time-outline"
+                  size={scale(16)}
+                  color={ThemeColors.textSecondary}
+                />
+                <Text style={styles.detailLabel}>Duration</Text>
+                <Text style={styles.detailValue}>{activityData.duration}</Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Icon
+                  name="calendar-outline"
+                  size={scale(16)}
+                  color={ThemeColors.textSecondary}
+                />
+                <Text style={styles.detailLabel}>Start Date</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(activityData.startDate)}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Icon
+                  name="calendar-outline"
+                  size={scale(16)}
+                  color={ThemeColors.textSecondary}
+                />
+                <Text style={styles.detailLabel}>End Date</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(activityData.endDate)}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Icon
+                  name="flag-outline"
+                  size={scale(16)}
+                  color={ThemeColors.textSecondary}
+                />
+                <Text style={styles.detailLabel}>Priority</Text>
+                <Text style={styles.detailValue}>
+                  Level {activityData.priority}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Icon
+                  name="color-palette-outline"
+                  size={scale(16)}
+                  color={ThemeColors.textSecondary}
+                />
+                <Text style={styles.detailLabel}>Color</Text>
+                <View
+                  style={[
+                    styles.colorIndicator,
+                    { backgroundColor: activityData.color },
+                  ]}
+                />
+              </View>
+            </View>
+
+            {/* Description */}
+            {activityData.description && (
+              <View style={styles.descriptionCard}>
+                <Text style={styles.sectionTitle}>Description</Text>
+                <Text style={styles.descriptionText}>
+                  {activityData.description}
+                </Text>
+              </View>
+            )}
+
+            {/* Tags */}
+            <View style={styles.tagsCard}>
+              <View style={styles.tagsHeader}>
+                <Text style={styles.sectionTitle}>Tags</Text>
+                <TouchableOpacity onPress={() => setShowTagModal(true)}>
+                  <Icon
+                    name="add"
+                    size={scale(20)}
+                    color={ThemeColors.primary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.tagsContainer}>
+                {activityData.tags.map((tag, index) => (
+                  <View key={index} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Notes */}
+            {activityData.notes && (
+              <View style={styles.notesCard}>
+                <Text style={styles.sectionTitle}>Notes</Text>
+                <Text style={styles.notesText}>{activityData.notes}</Text>
+              </View>
+            )}
+          </Animated.View>
         )}
 
-        <View style={styles.timerControls}>
-          <View style={styles.timerOuterRing}>
-            {/* Minutes markers */}
-            {getTimerMarkers().map((marker, index) => (
-              <Text
-                key={`minute-marker-${marker.value}-${index}`}
-                style={[
-                  styles.minuteLabel,
-                  marker.isLarge ? styles.largeMinuteLabel : {},
-                  getMinuteLabelPosition(
-                    marker.value,
-                    Math.ceil(activityTotalDuration / (60 * 1000))
-                  ),
-                ]}
-              >
-                {marker.value}
-              </Text>
-            ))}
+        {/* History Tab */}
+        {activeTab === "history" && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <View style={styles.historyCard}>
+              <Text style={styles.sectionTitle}>Interaction History</Text>
 
-            {/* Progress indicator at the top */}
-            <View style={styles.timerIndicator} />
-
-            {/* Background circle */}
-            <View style={styles.timerBackground} />
-
-            {/* Calculate the arc angles */}
-            {(() => {
-              const arcAngles = calculateArcAngles();
-
-              return (
-                <>
-                  {/* Interruption Arc - Purple */}
-                  {arcAngles.interruptionEnd > 0 && (
-                    <View
-                      style={styles.arcContainer}
-                      key="interruption-arc-container"
-                    >
-                      <Svg
-                        width={timerSize}
-                        height={timerSize}
-                        style={styles.arcSvg}
-                      >
-                        <Path
-                          key="interruption-arc-path"
-                          d={getArcPath(
-                            arcAngles.interruptionStart,
-                            arcAngles.interruptionEnd,
-                            timerRadius - timerInnerOffset,
-                            timerThickness - timerInnerOffset * 2
-                          )}
-                          fill="#9c6cda"
-                          strokeWidth={0}
-                        />
-                      </Svg>
-                    </View>
-                  )}
-
-                  {/* Remaining Arc - Cyan */}
-                  {arcAngles.remainingEnd > arcAngles.remainingStart && (
-                    <View
-                      style={styles.arcContainer}
-                      key="remaining-arc-container"
-                    >
-                      <Svg
-                        width={timerSize}
-                        height={timerSize}
-                        style={styles.arcSvg}
-                      >
-                        <Path
-                          key="remaining-arc-path"
-                          d={getArcPath(
-                            arcAngles.remainingStart,
-                            arcAngles.remainingEnd,
-                            timerRadius - timerInnerOffset,
-                            timerThickness - timerInnerOffset * 2
-                          )}
-                          fill="#00E5FF"
-                          strokeWidth={0}
-                        />
-                      </Svg>
-                    </View>
-                  )}
-                </>
-              );
-            })()}
-
-            {/* Inner circle with gradient */}
-            <LinearGradient
-              colors={
-                timerStatus === "completed"
-                  ? ["#388E3C", "#4CAF50"]
-                  : timerStatus === "interrupted"
-                  ? ["#D32F2F", "#F44336"]
-                  : ["#3a2b4f", "#4a3b6f"]
-              }
-              style={styles.timerInnerRing}
-            >
-              <View style={styles.timerButtonsContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.timerButton,
-                    timerStatus === "completed" && styles.completedButton,
-                    timerStatus === "interrupted" && styles.interruptedButton,
-                  ]}
-                  onPress={toggleTimer}
-                  activeOpacity={0.8}
-                  disabled={timerStatus === "completed"}
-                >
-                  <Icon
-                    name={
-                      timerStatus === "completed"
-                        ? "checkmark"
-                        : timerStatus === "running"
-                        ? "pause"
-                        : "play"
-                    }
-                    size={28}
-                    color="#fff"
-                  />
-                  <Text style={styles.buttonLabel}>
-                    {timerStatus === "completed"
-                      ? "Done"
-                      : timerStatus === "running"
-                      ? "Pause"
-                      : timerStatus === "interrupted"
-                      ? "Resume"
-                      : "Start"}
-                  </Text>
-                </TouchableOpacity>
-
-                {timerStatus === "running" && (
-                  <TouchableOpacity
-                    style={styles.interruptButton}
-                    onPress={startInterruption}
-                  >
-                    <Icon name="hand-right-outline" size={18} color="#fff" />
-                    <Text style={styles.buttonLabel}>Interrupt</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </LinearGradient>
-          </View>
-
-          {/* Timeline Legend */}
-          <View style={styles.timelineLegend}>
-            <View style={styles.legendItem}>
-              <View
-                style={[styles.legendColor, { backgroundColor: "#00E5FF" }]}
-              />
-              <Text style={styles.legendText}>
-                Remaining: {formatFullTime(remainingTime)}
-              </Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View
-                style={[styles.legendColor, { backgroundColor: "#9c6cda" }]}
-              />
-              <Text style={styles.legendText}>
-                Interruptions: {formatFullTime(getInterruptionsTotalDuration())}
-              </Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: "#555" }]} />
-              <Text style={styles.legendText}>
-                Total: {formatFullTime(activityTotalDuration)}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Interruptions section */}
-        {activityData.interuption.length > 0 && (
-          <View style={styles.interruptionsSection}>
-            <Text style={styles.sectionTitle}>Interruptions</Text>
-            <View style={styles.interruptionsContainer}>
-              {activityData.interuption.map((interruption, index) => (
-                <View
-                  key={`interruption-item-${interruption.id || index}`}
-                  style={styles.interruptionItem}
-                >
-                  <View style={styles.interruptIcon}>
-                    <Icon name="pause" size={16} color="#fff" />
+              {interactionHistory.map((interaction, index) => (
+                <View key={interaction.id} style={styles.historyItem}>
+                  <View style={styles.historyIcon}>
+                    <Icon
+                      name={getInteractionIcon(interaction.type)}
+                      size={scale(16)}
+                      color={getInteractionColor(interaction.type)}
+                    />
                   </View>
-                  <Text style={styles.interruptionText}>
-                    {interruption.CoverdTime} · {interruption.StartTime}
-                  </Text>
+
+                  <View style={styles.historyContent}>
+                    <Text style={styles.historyTitle}>
+                      {interaction.type.charAt(0).toUpperCase() +
+                        interaction.type.slice(1)}
+                    </Text>
+                    <Text style={styles.historyTime}>
+                      {formatTime(interaction.timestamp)} •{" "}
+                      {formatDate(interaction.timestamp)}
+                    </Text>
+                    {interaction.duration && (
+                      <Text style={styles.historyDuration}>
+                        Duration: {interaction.duration}
+                      </Text>
+                    )}
+                    {interaction.note && (
+                      <Text style={styles.historyNote}>{interaction.note}</Text>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
-          </View>
+          </Animated.View>
+        )}
+
+        {/* Streak Tab */}
+        {activeTab === "streak" && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <View style={styles.streakCard}>
+              <Text style={styles.sectionTitle}>Streak History</Text>
+
+              <View style={styles.streakSummary}>
+                <View style={styles.streakSummaryItem}>
+                  <Text style={styles.streakSummaryLabel}>Current Streak</Text>
+                  <Text style={styles.streakSummaryValue}>
+                    {activityData.streak} days
+                  </Text>
+                </View>
+
+                <View style={styles.streakSummaryItem}>
+                  <Text style={styles.streakSummaryLabel}>Longest Streak</Text>
+                  <Text style={styles.streakSummaryValue}>12 days</Text>
+                </View>
+              </View>
+
+              <View style={styles.streakHistory}>
+                {streakHistory.map((streak, index) => (
+                  <View key={index} style={styles.streakHistoryItem}>
+                    <View style={styles.streakHistoryDate}>
+                      <Text style={styles.streakHistoryDay}>
+                        {new Date(streak.date).toLocaleDateString("en-US", {
+                          day: "numeric",
+                        })}
+                      </Text>
+                      <Text style={styles.streakHistoryMonth}>
+                        {new Date(streak.date).toLocaleDateString("en-US", {
+                          month: "short",
+                        })}
+                      </Text>
+                    </View>
+
+                    <View style={styles.streakHistoryContent}>
+                      <View style={styles.streakHistoryStars}>
+                        {renderStreakStars(streak.streak, 10)}
+                      </View>
+                      <Text style={styles.streakHistoryStatus}>
+                        {streak.completed ? "Completed" : "Missed"}
+                      </Text>
+                      {streak.completed && (
+                        <Text style={styles.streakHistoryTime}>
+                          {Math.floor(streak.timeSpent / 60)}m
+                        </Text>
+                      )}
+                    </View>
+
+                    <View
+                      style={[
+                        styles.streakHistoryIndicator,
+                        {
+                          backgroundColor: streak.completed
+                            ? ThemeColors.success
+                            : ThemeColors.textMuted,
+                        },
+                      ]}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          </Animated.View>
         )}
       </ScrollView>
 
+      {/* Edit Modal */}
       <Modal
-        visible={showTagModal}
+        visible={showEditModal}
         transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowTagModal(false)}
+        animationType="none"
+        onRequestClose={hideEditModal}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Add New Tag</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Tag name"
-              placeholderTextColor="#666"
-              value={newTagName}
-              onChangeText={setNewTagName}
-            />
-
-            <Text style={styles.iconSectionTitle}>Select Icon</Text>
-
-            <FlatList
-              data={iconOptions}
-              keyExtractor={(item, index) => `icon-option-${item}-${index}`}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.iconList}
-              renderItem={({ item, index }) => (
-                <TouchableOpacity
-                  key={`icon-${item}-${index}`}
-                  style={[
-                    styles.iconOption,
-                    selectedIcon === item && styles.selectedIconOption,
-                  ]}
-                  onPress={() => setSelectedIcon(item)}
-                >
-                  <Icon name={item} size={24} color="#fff" />
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[
+              styles.modalContainer,
+              {
+                transform: [{ scale: modalScaleAnim }],
+                opacity: modalOpacityAnim,
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[ThemeColors.card, ThemeColors.cardSecondary]}
+              style={styles.modalGradient}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Activity</Text>
+                <TouchableOpacity onPress={hideEditModal}>
+                  <Icon
+                    name="close"
+                    size={scale(24)}
+                    color={ThemeColors.text}
+                  />
                 </TouchableOpacity>
-              )}
-            />
+              </View>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowTagModal(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
+              <ScrollView style={styles.modalContent}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Title</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editForm.title}
+                    onChangeText={(text) =>
+                      setEditForm({ ...editForm, title: text })
+                    }
+                    placeholder="Activity title"
+                    placeholderTextColor={ThemeColors.textMuted}
+                  />
+                </View>
 
-              <TouchableOpacity
-                style={[styles.modalButton, styles.addButton]}
-                onPress={addTag}
-              >
-                <Text style={styles.modalButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Category</Text>
+                  <View style={styles.categorySelector}>
+                    {(["Workout", "Work", "Personal"] as Category[]).map(
+                      (cat) => (
+                        <TouchableOpacity
+                          key={cat}
+                          style={[
+                            styles.categoryOption,
+                            editForm.category === cat &&
+                              styles.selectedCategoryOption,
+                          ]}
+                          onPress={() =>
+                            setEditForm({ ...editForm, category: cat })
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.categoryOptionText,
+                              editForm.category === cat &&
+                                styles.selectedCategoryOptionText,
+                            ]}
+                          >
+                            {cat}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Description</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={editForm.description}
+                    onChangeText={(text) =>
+                      setEditForm({ ...editForm, description: text })
+                    }
+                    placeholder="Activity description"
+                    placeholderTextColor={ThemeColors.textMuted}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Notes</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={editForm.notes}
+                    onChangeText={(text) =>
+                      setEditForm({ ...editForm, notes: text })
+                    }
+                    placeholder="Additional notes"
+                    placeholderTextColor={ThemeColors.textMuted}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Priority</Text>
+                  <View style={styles.prioritySelector}>
+                    {[1, 2, 3].map((priority) => (
+                      <TouchableOpacity
+                        key={priority}
+                        style={[
+                          styles.priorityOption,
+                          editForm.priority === priority &&
+                            styles.selectedPriorityOption,
+                        ]}
+                        onPress={() => setEditForm({ ...editForm, priority })}
+                      >
+                        <Text
+                          style={[
+                            styles.priorityOptionText,
+                            editForm.priority === priority &&
+                              styles.selectedPriorityOptionText,
+                          ]}
+                        >
+                          {priority}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={hideEditModal}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleEditActivity}
+                >
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModalContainer}>
+            <LinearGradient
+              colors={[ThemeColors.card, ThemeColors.cardSecondary]}
+              style={styles.deleteModalGradient}
+            >
+              <Icon
+                name="alert-circle-outline"
+                size={scale(48)}
+                color={ThemeColors.danger}
+              />
+              <Text style={styles.deleteModalTitle}>Delete Activity</Text>
+              <Text style={styles.deleteModalText}>
+                Are you sure you want to delete "{activityData.title}"? This
+                action cannot be undone.
+              </Text>
+
+              <View style={styles.deleteModalActions}>
+                <TouchableOpacity
+                  style={styles.deleteCancelButton}
+                  onPress={() => setShowDeleteModal(false)}
+                >
+                  <Text style={styles.deleteCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.deleteConfirmButton}
+                  onPress={handleDeleteActivity}
+                >
+                  <Text style={styles.deleteConfirmButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
           </View>
         </View>
       </Modal>
@@ -955,417 +1081,671 @@ const styles = StyleSheet.create({
   // Layout and container styles
   safeArea: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "#000000",
   },
   container: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "#000000",
   },
   contentContainer: {
     paddingBottom: 30,
   },
 
-  // Header styles
+  // Enhanced Header styles
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-    backgroundColor: "#121212",
+    paddingTop: 15,
+    paddingBottom: 15,
+    backgroundColor: "transparent",
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2a2a",
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  headerButton: {
+    padding: 5,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    marginLeft: 10,
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#fff",
   },
-
-  // Title and category styles
-  titleContainer: {
-    paddingHorizontal: 20,
-    marginVertical: 15,
+  headerSubtitle: {
+    fontSize: 12,
+    color: "#9c9c9c",
+    marginTop: 2,
   },
-  title: {
-    fontSize: 26,
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  // Tab Navigation styles
+  tabContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    backgroundColor: "#1E1E1E",
+    paddingVertical: 10,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  tabButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+  },
+  activeTabButton: {
+    backgroundColor: "#2d2d2d",
+    borderRadius: 10,
+  },
+  tabText: {
+    color: "#9c9c9c",
+    fontSize: 12,
+    marginLeft: 5,
+  },
+  activeTabText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+
+  // Status Card styles
+  statusCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  statusCardGradient: {
+    padding: 20,
+  },
+  statusHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  statusInfo: {
+    flex: 1,
+  },
+  statusTitle: {
+    fontSize: 24,
     fontWeight: "bold",
     color: "#fff",
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  category: {
-    fontSize: 14,
+  statusBadge: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  statusIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statusDetails: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  statusItem: {
+    alignItems: "center",
+  },
+  statusLabel: {
     color: "#9c9c9c",
+    fontSize: 13,
+    marginBottom: 5,
   },
-  sectionTitle: {
+  statusValue: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  streakDisplay: {
+    flexDirection: "row",
+    marginTop: 5,
+  },
+
+  // Timer Card styles
+  timerCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  timerHeader: {
+    padding: 20,
+    backgroundColor: "#121212",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  timerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 5,
+  },
+  timerValue: {
+    fontSize: 40,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  timerControls: {
+    padding: 20,
+    backgroundColor: "#121212",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.1)",
+  },
+  timerButton: {
+    width: "100%",
+    height: 50,
+    borderRadius: 10,
+    backgroundColor: "rgba(58, 43, 79, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  activeTimerButton: {
+    backgroundColor: "rgba(58, 43, 79, 0.9)",
+  },
+  timerButtonText: {
+    color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 10,
-    paddingHorizontal: 20,
+    marginLeft: 10,
   },
 
-  // Tag styles
+  // Details Card styles
+  detailsCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
+  },
+  detailLabel: {
+    color: "#9c9c9c",
+    fontSize: 14,
+    marginLeft: 10,
+    flex: 1,
+  },
+  detailValue: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  // Description Card styles
+  descriptionCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  descriptionText: {
+    color: "#fff",
+    fontSize: 14,
+    padding: 20,
+    lineHeight: 22,
+  },
+
+  // Tags Card styles
+  tagsCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  tagsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
   tagsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    padding: 20,
   },
   tag: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#252525",
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 15,
+    borderRadius: 10,
     marginRight: 8,
     marginBottom: 8,
   },
   tagText: {
     color: "#fff",
-    marginLeft: 5,
-    marginRight: 5,
-    fontSize: 12,
-  },
-  addTagButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#2d2d2d",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  addTagText: {
-    color: "#fff",
-    fontWeight: "bold",
     fontSize: 12,
   },
 
-  // Timer section styles
-  timerSection: {
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  timerValue: {
-    fontSize: 48,
-    fontWeight: "bold",
-    color: "#fff",
-    letterSpacing: 2,
-  },
-  completedTimerValue: {
-    color: "#4CAF50",
-  },
-  timerSubtext: {
-    fontSize: 16,
-    color: "#9c9c9c",
-    marginTop: 5,
-  },
-
-  // Completion message styles
-  completionContainer: {
-    alignItems: "center",
-    backgroundColor: "rgba(76, 175, 80, 0.1)",
-    paddingVertical: 15,
+  // Notes Card styles
+  notesCard: {
+    borderRadius: 16,
+    overflow: "hidden",
     marginHorizontal: 20,
-    borderRadius: 12,
     marginBottom: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  completionText: {
-    fontSize: 16,
-    color: "#4CAF50",
-    marginTop: 8,
-    fontWeight: "500",
-  },
-
-  // Timer controls and visualization styles
-  timerControls: {
-    justifyContent: "center",
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  timerOuterRing: {
-    width: width * 0.75,
-    height: width * 0.75,
-    maxWidth: 300,
-    maxHeight: 300,
-    borderRadius: width * 0.375,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    backgroundColor: "transparent",
-    marginTop: 15,
-  },
-  timerBackground: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    borderRadius: width * 0.375,
-    borderWidth: 16,
-    borderColor: "#2a2a2a",
-  },
-  timerIndicator: {
-    position: "absolute",
-    top: 0,
-    width: 4,
-    height: 15,
-    backgroundColor: "#fff",
-    borderRadius: 2,
-    zIndex: 10,
-  },
-  timerInnerRing: {
-    width: width * 0.4,
-    height: width * 0.4,
-    maxWidth: 160,
-    maxHeight: 160,
-    borderRadius: width * 0.2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  arcContainer: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  arcSvg: {
-    position: "absolute",
-  },
-
-  // Timer button styles
-  timerButtonsContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  timerButton: {
-    width: width * 0.3,
-    height: width * 0.3,
-    maxWidth: 120,
-    maxHeight: 120,
-    borderRadius: width * 0.15,
-    backgroundColor: "rgba(58, 43, 79, 0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  completedButton: {
-    backgroundColor: "rgba(56, 142, 60, 0.8)",
-  },
-  interruptedButton: {
-    backgroundColor: "rgba(211, 47, 47, 0.8)",
-  },
-  interruptButton: {
-    flexDirection: "row",
-    width: 90,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(211, 47, 47, 0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 15,
-  },
-  buttonLabel: {
+  notesText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "500",
-    marginTop: 5,
+    padding: 20,
+    lineHeight: 22,
   },
 
-  // Minute label styles
-  minuteLabel: {
-    color: "#9c9c9c",
-    fontSize: 12,
-    fontWeight: "400",
-  },
-  largeMinuteLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#fff",
-  },
-
-  // Timeline and legend styles
-  timelineContainer: {
-    marginHorizontal: 20,
-    height: 8,
-    flexDirection: "row",
-    backgroundColor: "#2a2a2a",
-    borderRadius: 4,
+  // History Card styles
+  historyCard: {
+    borderRadius: 16,
     overflow: "hidden",
-    marginBottom: 15,
-  },
-  timelineSegment: {
-    height: "100%",
-  },
-  timelineLegend: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 10,
+    marginHorizontal: 20,
     marginBottom: 20,
-    paddingHorizontal: 10,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  legendItem: {
+  historyItem: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  legendColor: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 5,
-  },
-  legendText: {
-    color: "#fff",
-    fontSize: 12,
-  },
-
-  // Progress bar styles
-  progressBar: {
-    height: 8,
-    flexDirection: "row",
-    backgroundColor: "transparent",
-    borderRadius: 4,
-    overflow: "hidden",
-    marginBottom: 15,
-    marginHorizontal: 20,
-  },
-  progressSegment: {
-    height: "100%",
-  },
-
-  // Stats section styles
-  statsSection: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    backgroundColor: "#1a1a1a",
-    marginHorizontal: 20,
-    marginVertical: 15,
-    borderRadius: 12,
     padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
-  statItem: {
-    alignItems: "center",
-  },
-  statLabel: {
-    color: "#9c9c9c",
-    marginBottom: 5,
-    fontSize: 13,
-  },
-  statValue: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-
-  // Interruption styles
-  interruptionsSection: {
-    marginBottom: 20,
-  },
-  interruptionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 15,
-  },
-  interruptionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1e1e2c",
-    padding: 16,
-    borderRadius: 10,
-    marginVertical: 5,
-    marginHorizontal: 20,
-  },
-  interruptIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#3a2b4f",
+  historyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 15,
   },
-  interruptionText: {
+  historyContent: {
+    flex: 1,
+  },
+  historyTitle: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  historyTime: {
+    color: "#9c9c9c",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  historyDuration: {
+    color: "#9c9c9c",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  historyNote: {
+    color: "#9c9c9c",
+    fontSize: 12,
+    marginTop: 2,
   },
 
-  // Modal styles
-  modalContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  // Streak Card styles
+  streakCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  modalContent: {
-    backgroundColor: "#1a1a1a",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+  streakSummary: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
-  modalHandle: {
-    width: 40,
-    height: 5,
-    backgroundColor: "#666",
-    borderRadius: 3,
-    alignSelf: "center",
-    marginBottom: 15,
+  streakSummaryItem: {
+    alignItems: "center",
   },
-  modalTitle: {
+  streakSummaryLabel: {
+    color: "#9c9c9c",
+    fontSize: 13,
+    marginBottom: 5,
+  },
+  streakSummaryValue: {
     color: "#fff",
     fontSize: 20,
     fontWeight: "bold",
+  },
+  streakHistory: {
+    padding: 20,
+  },
+  streakHistoryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  streakHistoryDate: {
+    width: 60,
+    alignItems: "center",
+  },
+  streakHistoryDay: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  streakHistoryMonth: {
+    color: "#9c9c9c",
+    fontSize: 12,
+  },
+  streakHistoryContent: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  streakHistoryStars: {
+    flexDirection: "row",
+    marginBottom: 5,
+  },
+  streakHistoryStatus: {
+    color: "#9c9c9c",
+    fontSize: 12,
+  },
+  streakHistoryTime: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginTop: 2,
+  },
+  streakHistoryIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginLeft: 10,
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  modalContainer: {
+    width: "90%",
+    borderRadius: 20,
+    overflow: "hidden",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  modalGradient: {
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
-    textAlign: "center",
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  modalContent: {
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 15,
+  },
+  inputLabel: {
+    color: "#9c9c9c",
+    fontSize: 14,
+    marginBottom: 8,
   },
   input: {
     backgroundColor: "#252525",
     borderRadius: 10,
     padding: 15,
     color: "#fff",
-    marginBottom: 20,
     fontSize: 16,
   },
-  iconSectionTitle: {
-    color: "#ccc",
-    marginBottom: 10,
-    fontSize: 16,
+  textArea: {
+    minHeight: 80,
+    paddingTop: 15,
   },
-  iconList: {
-    paddingVertical: 10,
-  },
-  iconOption: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  categorySelector: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
     backgroundColor: "#252525",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
+    borderRadius: 10,
+    padding: 5,
   },
-  selectedIconOption: {
+  categoryOption: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginVertical: 5,
+  },
+  selectedCategoryOption: {
     backgroundColor: "#3a2b4f",
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: "#9c6cda",
   },
-  modalButtons: {
+  categoryOptionText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  selectedCategoryOptionText: {
+    color: "#9c6cda",
+  },
+  prioritySelector: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "space-around",
+    backgroundColor: "#252525",
+    borderRadius: 10,
+    padding: 5,
+  },
+  priorityOption: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginVertical: 5,
+  },
+  selectedPriorityOption: {
+    backgroundColor: "#3a2b4f",
+    borderWidth: 1,
+    borderColor: "#9c6cda",
+  },
+  priorityOptionText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  selectedPriorityOptionText: {
+    color: "#9c6cda",
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginTop: 20,
   },
-  modalButton: {
+  cancelButton: {
     flex: 1,
+    paddingVertical: 12,
     borderRadius: 10,
-    padding: 15,
+    backgroundColor: "#333",
+    alignItems: "center",
     marginHorizontal: 5,
-    justifyContent: "center",
+  },
+  cancelButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: "#9c6cda",
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+
+  // Streak Star styles
+  streakStarContainer: {
+    flexDirection: "row",
     alignItems: "center",
   },
-  cancelButton: {
+  streakOverflowText: {
+    color: "#FFD700",
+    fontSize: 12,
+    marginLeft: 5,
+  },
+
+  // Color indicator
+  colorIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+
+  // Delete Modal styles
+  deleteModalContainer: {
+    width: "90%",
+    maxWidth: 400,
+    borderRadius: 20,
+    overflow: "hidden",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  deleteModalGradient: {
+    padding: 30,
+    alignItems: "center",
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#fff",
+    marginTop: 15,
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  deleteModalText: {
+    fontSize: 16,
+    color: "#9c9c9c",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 25,
+  },
+  deleteModalActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+  },
+  deleteCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
     backgroundColor: "#333",
+    alignItems: "center",
+    marginHorizontal: 5,
   },
-  addButton: {
-    backgroundColor: "#9c6cda",
+  deleteCancelButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
-  modalButtonText: {
+  deleteConfirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: "#FF4757",
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  deleteConfirmButtonText: {
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
