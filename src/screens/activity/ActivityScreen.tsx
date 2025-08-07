@@ -104,13 +104,14 @@ const getCardBackground = (activity: EnhancedActivity): [string, string] => {
   }
 
   if (activity.isRunning) {
-    // Use activity's own color when running
+    // Use activity's own color when running with higher opacity
     const baseColor = activity.color || "#00E5FF";
-    // Create a darker gradient from the activity color
-    return [baseColor + "20", baseColor + "10"]; // 20% and 10% opacity
+    // Create a more vibrant gradient from the activity color
+    return [baseColor + "40", baseColor + "20"]; // 40% and 20% opacity
   } else {
-    // Use gray/black when inactive
-    return ["#1A1A1A", "#0A0A0A"]; // Dark gray/black gradient
+    // Use activity color with lower opacity when inactive
+    const baseColor = activity.color || "#00E5FF";
+    return [baseColor + "15", baseColor + "08"]; // 15% and 8% opacity
   }
 };
 
@@ -270,7 +271,7 @@ const ActivityScreen = () => {
           priority: 1,
           isRunning: true,
           currentTimer: "00:45:30",
-          remainingSeconds: 10,
+          remainingSeconds: 100,
           completionPercentage: 25,
           elapsedSeconds: 870,
           totalTimeSpent: 870,
