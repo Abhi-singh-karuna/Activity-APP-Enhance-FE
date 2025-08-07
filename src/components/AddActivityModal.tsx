@@ -42,7 +42,7 @@ const scale = (size: number) => {
 // Theme colors
 const ThemeColors = {
   primary: "#00E5FF",
-  secondary: "#9C6CDA", 
+  secondary: "#9C6CDA",
   success: "#4ECDC4",
   warning: "#FF9500",
   danger: "#FF4757",
@@ -58,17 +58,52 @@ const ThemeColors = {
 
 // Enhanced color palette for horizontal slider
 const ACTIVITY_COLORS = [
-  "#00E5FF", "#9C6CDA", "#4ECDC4", "#FF9500", "#FF4757", "#FF6B9D", 
-  "#FFD93D", "#6C5CE7", "#1E88E5", "#8E24AA", "#43A047", "#FB8C00",
-  "#E91E63", "#00ACC1", "#F44336", "#2196F3", "#009688", "#4CAF50",
-  "#FFC107", "#9C27B0", "#FF5722", "#673AB7", "#03A9F4", "#8BC34A"
+  "#00E5FF",
+  "#9C6CDA",
+  "#4ECDC4",
+  "#FF9500",
+  "#FF4757",
+  "#FF6B9D",
+  "#FFD93D",
+  "#6C5CE7",
+  "#1E88E5",
+  "#8E24AA",
+  "#43A047",
+  "#FB8C00",
+  "#E91E63",
+  "#00ACC1",
+  "#F44336",
+  "#2196F3",
+  "#009688",
+  "#4CAF50",
+  "#FFC107",
+  "#9C27B0",
+  "#FF5722",
+  "#673AB7",
+  "#03A9F4",
+  "#8BC34A",
 ];
 
 // Category options with icons for horizontal slider
 const CATEGORIES = [
-  { id: "Personal", label: "Personal", icon: "person", color: ThemeColors.primary },
-  { id: "Work", label: "Work", icon: "briefcase", color: ThemeColors.secondary },
-  { id: "Workout", label: "Workout", icon: "fitness", color: ThemeColors.success },
+  {
+    id: "Personal",
+    label: "Personal",
+    icon: "person",
+    color: ThemeColors.primary,
+  },
+  {
+    id: "Work",
+    label: "Work",
+    icon: "briefcase",
+    color: ThemeColors.secondary,
+  },
+  {
+    id: "Workout",
+    label: "Workout",
+    icon: "fitness",
+    color: ThemeColors.success,
+  },
   { id: "Study", label: "Study", icon: "school", color: ThemeColors.warning },
   { id: "Health", label: "Health", icon: "medical", color: "#FF6B9D" },
   { id: "Social", label: "Social", icon: "people", color: "#FFD93D" },
@@ -85,7 +120,7 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
   const buttonPulseAnim = useRef(new Animated.Value(1)).current;
-  
+
   // Loading state
   const [isLoading, setIsLoading] = useState(false);
 
@@ -103,7 +138,7 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   // Duration picker states
   const [durationHours, setDurationHours] = useState(1);
@@ -124,8 +159,8 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
     day: currentDate.getDate(),
   });
 
-  // Get font size multiplier from context
-  const { fontSizeMultiplier } = useAppContext();
+  // Get context
+  const {} = useAppContext();
 
   // Duration picker arrays
   const hours = Array.from({ length: 25 }, (_, i) => i); // 0-24
@@ -204,14 +239,21 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
     setDurationSeconds(0);
   }, []);
 
-  const formatDate = (dateObj: { year: number; month: number; day: number }) => {
+  const formatDate = (dateObj: {
+    year: number;
+    month: number;
+    day: number;
+  }) => {
     return `${dateObj.year}/${String(dateObj.month).padStart(2, "0")}/${String(
       dateObj.day
     ).padStart(2, "0")}`;
   };
 
   const formatDuration = (h: number, m: number, s: number) => {
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(
+      2,
+      "0"
+    )}:${String(s).padStart(2, "0")}`;
   };
 
   const parseDuration = (duration: string) => {
@@ -224,7 +266,7 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
   };
 
   const validateForm = useCallback(() => {
-    const newErrors: {[key: string]: string} = {};
+    const newErrors: { [key: string]: string } = {};
 
     if (!newActivity.title?.trim()) {
       newErrors.title = "Title required";
@@ -251,7 +293,7 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
 
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       onAdd(newActivity);
       onClose();
     } catch (error) {
@@ -264,29 +306,33 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
   // Date picker functions
   const confirmStartDate = useCallback(() => {
     const formattedDate = formatDate(startDateObj);
-    setNewActivity(prev => ({ ...prev, startDate: formattedDate }));
+    setNewActivity((prev) => ({ ...prev, startDate: formattedDate }));
     setShowStartDatePicker(false);
     if (errors.startDate) {
-      setErrors(prev => ({ ...prev, startDate: "" }));
+      setErrors((prev) => ({ ...prev, startDate: "" }));
     }
   }, [startDateObj, errors.startDate]);
 
   const confirmEndDate = useCallback(() => {
     const formattedDate = formatDate(endDateObj);
-    setNewActivity(prev => ({ ...prev, endDate: formattedDate }));
+    setNewActivity((prev) => ({ ...prev, endDate: formattedDate }));
     setShowEndDatePicker(false);
     if (errors.endDate) {
-      setErrors(prev => ({ ...prev, endDate: "" }));
+      setErrors((prev) => ({ ...prev, endDate: "" }));
     }
   }, [endDateObj, errors.endDate]);
 
   // Duration picker functions
   const confirmDuration = useCallback(() => {
-    const formattedDuration = formatDuration(durationHours, durationMinutes, durationSeconds);
-    setNewActivity(prev => ({ ...prev, duration: formattedDuration }));
+    const formattedDuration = formatDuration(
+      durationHours,
+      durationMinutes,
+      durationSeconds
+    );
+    setNewActivity((prev) => ({ ...prev, duration: formattedDuration }));
     setShowDurationPicker(false);
     if (errors.duration) {
-      setErrors(prev => ({ ...prev, duration: "" }));
+      setErrors((prev) => ({ ...prev, duration: "" }));
     }
   }, [durationHours, durationMinutes, durationSeconds, errors.duration]);
 
@@ -307,331 +353,394 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
   // Enhanced duration picker with better design
-  const renderDurationPicker = useCallback(() => (
-    <View style={styles.durationPickerModal}>
-      <View style={styles.durationPickerOverlay}>
-        <View style={styles.enhancedDurationPickerContainer}>
-          <LinearGradient
-            colors={["rgba(30, 30, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
-            style={styles.enhancedDurationPickerGradient}
-          >
-            {/* Enhanced Header */}
-            <View style={styles.enhancedDurationPickerHeader}>
-              <View style={styles.enhancedDurationPickerHeaderContent}>
-                <View style={styles.enhancedDurationPickerIconContainer}>
-                  <LinearGradient
-                    colors={[ThemeColors.primary, ThemeColors.secondary]}
-                    style={styles.enhancedDurationPickerIconGradient}
-                  >
-                    <Icon name="time" size={scale(22)} color="#fff" />
-                  </LinearGradient>
+  const renderDurationPicker = useCallback(
+    () => (
+      <View style={styles.durationPickerModal}>
+        <View style={styles.durationPickerOverlay}>
+          <View style={styles.enhancedDurationPickerContainer}>
+            <LinearGradient
+              colors={["rgba(30, 30, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
+              style={styles.enhancedDurationPickerGradient}
+            >
+              {/* Enhanced Header */}
+              <View style={styles.enhancedDurationPickerHeader}>
+                <View style={styles.enhancedDurationPickerHeaderContent}>
+                  <View style={styles.enhancedDurationPickerIconContainer}>
+                    <LinearGradient
+                      colors={[ThemeColors.primary, ThemeColors.secondary]}
+                      style={styles.enhancedDurationPickerIconGradient}
+                    >
+                      <Icon name="time" size={scale(22)} color="#fff" />
+                    </LinearGradient>
+                  </View>
+                  <View>
+                    <Text style={styles.enhancedDurationPickerTitle}>
+                      Select Duration
+                    </Text>
+                    <Text style={styles.enhancedDurationPickerSubtitle}>
+                      Choose activity time
+                    </Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.enhancedDurationPickerTitle}>Select Duration</Text>
-                  <Text style={styles.enhancedDurationPickerSubtitle}>Choose activity time</Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                onPress={() => setShowDurationPicker(false)} 
-                activeOpacity={0.7}
-                style={styles.enhancedDurationPickerClose}
-              >
-                <Icon name="close" size={scale(18)} color={ThemeColors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.enhancedDurationPickerContent}>
-              <View style={styles.enhancedDurationPickerColumns}>
-                {/* Hours Column */}
-                <View style={styles.enhancedDurationPickerColumn}>
-                  <Text style={styles.enhancedDurationColumnLabel}>Hours</Text>
-                  <ScrollView 
-                    style={styles.enhancedDurationColumnScroll}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.enhancedDurationScrollContent}
-                  >
-                    {hours.map((hour) => (
-                      <TouchableOpacity
-                        key={hour}
-                        style={[
-                          styles.enhancedDurationPickerItem,
-                          durationHours === hour && styles.enhancedDurationPickerItemSelected,
-                        ]}
-                        onPress={() => setDurationHours(hour)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.enhancedDurationPickerItemText,
-                            durationHours === hour && styles.enhancedDurationPickerItemTextSelected,
-                          ]}
-                        >
-                          {String(hour).padStart(2, "0")}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-
-                {/* Minutes Column */}
-                <View style={styles.enhancedDurationPickerColumn}>
-                  <Text style={styles.enhancedDurationColumnLabel}>Minutes</Text>
-                  <ScrollView 
-                    style={styles.enhancedDurationColumnScroll}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.enhancedDurationScrollContent}
-                  >
-                    {minutes.map((minute) => (
-                      <TouchableOpacity
-                        key={minute}
-                        style={[
-                          styles.enhancedDurationPickerItem,
-                          durationMinutes === minute && styles.enhancedDurationPickerItemSelected,
-                        ]}
-                        onPress={() => setDurationMinutes(minute)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.enhancedDurationPickerItemText,
-                            durationMinutes === minute && styles.enhancedDurationPickerItemTextSelected,
-                          ]}
-                        >
-                          {String(minute).padStart(2, "0")}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-
-                {/* Seconds Column */}
-                <View style={styles.enhancedDurationPickerColumn}>
-                  <Text style={styles.enhancedDurationColumnLabel}>Seconds</Text>
-                  <ScrollView 
-                    style={styles.enhancedDurationColumnScroll}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.enhancedDurationScrollContent}
-                  >
-                    {seconds.map((second) => (
-                      <TouchableOpacity
-                        key={second}
-                        style={[
-                          styles.enhancedDurationPickerItem,
-                          durationSeconds === second && styles.enhancedDurationPickerItemSelected,
-                        ]}
-                        onPress={() => setDurationSeconds(second)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.enhancedDurationPickerItemText,
-                            durationSeconds === second && styles.enhancedDurationPickerItemTextSelected,
-                          ]}
-                        >
-                          {String(second).padStart(2, "0")}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
+                <TouchableOpacity
+                  onPress={() => setShowDurationPicker(false)}
+                  activeOpacity={0.7}
+                  style={styles.enhancedDurationPickerClose}
+                >
+                  <Icon
+                    name="close"
+                    size={scale(18)}
+                    color={ThemeColors.textSecondary}
+                  />
+                </TouchableOpacity>
               </View>
 
-              {/* Enhanced Duration Preview */}
-              <View style={styles.enhancedDurationPreviewContainer}>
-                <Text style={styles.enhancedDurationPreviewLabel}>Selected Duration</Text>
-                <View style={styles.enhancedDurationPreviewBox}>
+              <View style={styles.enhancedDurationPickerContent}>
+                <View style={styles.enhancedDurationPickerColumns}>
+                  {/* Hours Column */}
+                  <View style={styles.enhancedDurationPickerColumn}>
+                    <Text style={styles.enhancedDurationColumnLabel}>
+                      Hours
+                    </Text>
+                    <ScrollView
+                      style={styles.enhancedDurationColumnScroll}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={
+                        styles.enhancedDurationScrollContent
+                      }
+                    >
+                      {hours.map((hour) => (
+                        <TouchableOpacity
+                          key={hour}
+                          style={[
+                            styles.enhancedDurationPickerItem,
+                            durationHours === hour &&
+                              styles.enhancedDurationPickerItemSelected,
+                          ]}
+                          onPress={() => setDurationHours(hour)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.enhancedDurationPickerItemText,
+                              durationHours === hour &&
+                                styles.enhancedDurationPickerItemTextSelected,
+                            ]}
+                          >
+                            {String(hour).padStart(2, "0")}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Minutes Column */}
+                  <View style={styles.enhancedDurationPickerColumn}>
+                    <Text style={styles.enhancedDurationColumnLabel}>
+                      Minutes
+                    </Text>
+                    <ScrollView
+                      style={styles.enhancedDurationColumnScroll}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={
+                        styles.enhancedDurationScrollContent
+                      }
+                    >
+                      {minutes.map((minute) => (
+                        <TouchableOpacity
+                          key={minute}
+                          style={[
+                            styles.enhancedDurationPickerItem,
+                            durationMinutes === minute &&
+                              styles.enhancedDurationPickerItemSelected,
+                          ]}
+                          onPress={() => setDurationMinutes(minute)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.enhancedDurationPickerItemText,
+                              durationMinutes === minute &&
+                                styles.enhancedDurationPickerItemTextSelected,
+                            ]}
+                          >
+                            {String(minute).padStart(2, "0")}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Seconds Column */}
+                  <View style={styles.enhancedDurationPickerColumn}>
+                    <Text style={styles.enhancedDurationColumnLabel}>
+                      Seconds
+                    </Text>
+                    <ScrollView
+                      style={styles.enhancedDurationColumnScroll}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={
+                        styles.enhancedDurationScrollContent
+                      }
+                    >
+                      {seconds.map((second) => (
+                        <TouchableOpacity
+                          key={second}
+                          style={[
+                            styles.enhancedDurationPickerItem,
+                            durationSeconds === second &&
+                              styles.enhancedDurationPickerItemSelected,
+                          ]}
+                          onPress={() => setDurationSeconds(second)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.enhancedDurationPickerItemText,
+                              durationSeconds === second &&
+                                styles.enhancedDurationPickerItemTextSelected,
+                            ]}
+                          >
+                            {String(second).padStart(2, "0")}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+
+                {/* Enhanced Duration Preview */}
+                <View style={styles.enhancedDurationPreviewContainer}>
+                  <Text style={styles.enhancedDurationPreviewLabel}>
+                    Selected Duration
+                  </Text>
+                  <View style={styles.enhancedDurationPreviewBox}>
+                    <LinearGradient
+                      colors={[
+                        "rgba(0, 229, 255, 0.15)",
+                        "rgba(156, 108, 218, 0.15)",
+                      ]}
+                      style={styles.enhancedDurationPreviewGradient}
+                    >
+                      <Text style={styles.enhancedDurationPreviewText}>
+                        {formatDuration(
+                          durationHours,
+                          durationMinutes,
+                          durationSeconds
+                        )}
+                      </Text>
+                    </LinearGradient>
+                  </View>
+                </View>
+
+                {/* Enhanced Confirm Button */}
+                <TouchableOpacity
+                  style={styles.enhancedDurationPickerConfirmButton}
+                  onPress={confirmDuration}
+                  activeOpacity={0.8}
+                >
                   <LinearGradient
-                    colors={["rgba(0, 229, 255, 0.15)", "rgba(156, 108, 218, 0.15)"]}
-                    style={styles.enhancedDurationPreviewGradient}
+                    colors={[ThemeColors.success, "#44A08D"]}
+                    style={styles.enhancedDurationPickerConfirmGradient}
                   >
-                    <Text style={styles.enhancedDurationPreviewText}>
-                      {formatDuration(durationHours, durationMinutes, durationSeconds)}
+                    <Icon
+                      name="checkmark-circle"
+                      size={scale(18)}
+                      color="#fff"
+                    />
+                    <Text style={styles.enhancedDurationPickerConfirmText}>
+                      Confirm Duration
                     </Text>
                   </LinearGradient>
-                </View>
+                </TouchableOpacity>
               </View>
-
-              {/* Enhanced Confirm Button */}
-              <TouchableOpacity
-                style={styles.enhancedDurationPickerConfirmButton}
-                onPress={confirmDuration}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={[ThemeColors.success, "#44A08D"]}
-                  style={styles.enhancedDurationPickerConfirmGradient}
-                >
-                  <Icon name="checkmark-circle" size={scale(18)} color="#fff" />
-                  <Text style={styles.enhancedDurationPickerConfirmText}>Confirm Duration</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
+            </LinearGradient>
+          </View>
         </View>
       </View>
-    </View>
-  ), [durationHours, durationMinutes, durationSeconds, confirmDuration]);
+    ),
+    [durationHours, durationMinutes, durationSeconds, confirmDuration]
+  );
 
   // Enhanced compact date picker
-  const renderCompactDatePicker = useCallback((
-    isStartDate: boolean,
-    dateObj: { year: number; month: number; day: number },
-    setDateObj: (obj: { year: number; month: number; day: number }) => void,
-    onConfirm: () => void,
-    onClose: () => void
-  ) => (
-    <View style={styles.compactDatePickerModal}>
-      <View style={styles.compactDatePickerOverlay}>
-        <View style={styles.enhancedDatePickerContainer}>
-          <LinearGradient
-            colors={["rgba(30, 30, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
-            style={styles.enhancedDatePickerGradient}
-          >
-            {/* Enhanced Date Picker Header */}
-            <View style={styles.enhancedDatePickerHeader}>
-              <View style={styles.enhancedDatePickerHeaderContent}>
-                <View style={styles.enhancedDatePickerIconContainer}>
+  const renderCompactDatePicker = useCallback(
+    (
+      isStartDate: boolean,
+      dateObj: { year: number; month: number; day: number },
+      setDateObj: (obj: { year: number; month: number; day: number }) => void,
+      onConfirm: () => void,
+      onClose: () => void
+    ) => (
+      <View style={styles.compactDatePickerModal}>
+        <View style={styles.compactDatePickerOverlay}>
+          <View style={styles.enhancedDatePickerContainer}>
+            <LinearGradient
+              colors={["rgba(30, 30, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
+              style={styles.enhancedDatePickerGradient}
+            >
+              {/* Enhanced Date Picker Header */}
+              <View style={styles.enhancedDatePickerHeader}>
+                <View style={styles.enhancedDatePickerHeaderContent}>
+                  <View style={styles.enhancedDatePickerIconContainer}>
+                    <LinearGradient
+                      colors={[ThemeColors.primary, ThemeColors.secondary]}
+                      style={styles.enhancedDatePickerIconGradient}
+                    >
+                      <Icon name="calendar" size={scale(20)} color="#fff" />
+                    </LinearGradient>
+                  </View>
+                  <View>
+                    <Text style={styles.enhancedDatePickerTitle}>
+                      {isStartDate ? "Start Date" : "End Date"}
+                    </Text>
+                    <Text style={styles.enhancedDatePickerSubtitle}>
+                      Choose activity {isStartDate ? "start" : "end"} date
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={onClose}
+                  activeOpacity={0.7}
+                  style={styles.enhancedDatePickerClose}
+                >
+                  <Icon
+                    name="close"
+                    size={scale(18)}
+                    color={ThemeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.enhancedDatePickerContent}>
+                <View style={styles.enhancedDatePickerColumns}>
+                  {/* Year Column */}
+                  <View style={styles.enhancedDatePickerColumn}>
+                    <Text style={styles.enhancedDateColumnLabel}>Year</Text>
+                    <ScrollView
+                      style={styles.enhancedDateColumnScroll}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.enhancedDateScrollContent}
+                    >
+                      {years.map((year) => (
+                        <TouchableOpacity
+                          key={year}
+                          style={[
+                            styles.enhancedDatePickerItem,
+                            dateObj.year === year &&
+                              styles.enhancedDatePickerItemSelected,
+                          ]}
+                          onPress={() => setDateObj({ ...dateObj, year })}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.enhancedDatePickerItemText,
+                              dateObj.year === year &&
+                                styles.enhancedDatePickerItemTextSelected,
+                            ]}
+                          >
+                            {year}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Month Column */}
+                  <View style={styles.enhancedDatePickerColumn}>
+                    <Text style={styles.enhancedDateColumnLabel}>Month</Text>
+                    <ScrollView
+                      style={styles.enhancedDateColumnScroll}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.enhancedDateScrollContent}
+                    >
+                      {months.map((month) => (
+                        <TouchableOpacity
+                          key={month}
+                          style={[
+                            styles.enhancedDatePickerItem,
+                            dateObj.month === month &&
+                              styles.enhancedDatePickerItemSelected,
+                          ]}
+                          onPress={() => setDateObj({ ...dateObj, month })}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.enhancedDatePickerItemText,
+                              dateObj.month === month &&
+                                styles.enhancedDatePickerItemTextSelected,
+                            ]}
+                          >
+                            {String(month).padStart(2, "0")}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Day Column */}
+                  <View style={styles.enhancedDatePickerColumn}>
+                    <Text style={styles.enhancedDateColumnLabel}>Day</Text>
+                    <ScrollView
+                      style={styles.enhancedDateColumnScroll}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.enhancedDateScrollContent}
+                    >
+                      {days.map((day) => (
+                        <TouchableOpacity
+                          key={day}
+                          style={[
+                            styles.enhancedDatePickerItem,
+                            dateObj.day === day &&
+                              styles.enhancedDatePickerItemSelected,
+                          ]}
+                          onPress={() => setDateObj({ ...dateObj, day })}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.enhancedDatePickerItemText,
+                              dateObj.day === day &&
+                                styles.enhancedDatePickerItemTextSelected,
+                            ]}
+                          >
+                            {String(day).padStart(2, "0")}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+
+                {/* Enhanced Date Confirm Button */}
+                <TouchableOpacity
+                  style={styles.enhancedDatePickerConfirmButton}
+                  onPress={onConfirm}
+                  activeOpacity={0.8}
+                >
                   <LinearGradient
                     colors={[ThemeColors.primary, ThemeColors.secondary]}
-                    style={styles.enhancedDatePickerIconGradient}
+                    style={styles.enhancedDatePickerConfirmGradient}
                   >
-                    <Icon name="calendar" size={scale(20)} color="#fff" />
+                    <Icon
+                      name="checkmark-circle"
+                      size={scale(18)}
+                      color="#fff"
+                    />
+                    <Text style={styles.enhancedDatePickerConfirmText}>
+                      Confirm Date
+                    </Text>
                   </LinearGradient>
-                </View>
-                <View>
-                  <Text style={styles.enhancedDatePickerTitle}>
-                    {isStartDate ? "Start Date" : "End Date"}
-                  </Text>
-                  <Text style={styles.enhancedDatePickerSubtitle}>
-                    Choose activity {isStartDate ? "start" : "end"} date
-                  </Text>
-                </View>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity 
-                onPress={onClose} 
-                activeOpacity={0.7}
-                style={styles.enhancedDatePickerClose}
-              >
-                <Icon name="close" size={scale(18)} color={ThemeColors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.enhancedDatePickerContent}>
-              <View style={styles.enhancedDatePickerColumns}>
-                {/* Year Column */}
-                <View style={styles.enhancedDatePickerColumn}>
-                  <Text style={styles.enhancedDateColumnLabel}>Year</Text>
-                  <ScrollView 
-                    style={styles.enhancedDateColumnScroll}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.enhancedDateScrollContent}
-                  >
-                    {years.map((year) => (
-                      <TouchableOpacity
-                        key={year}
-                        style={[
-                          styles.enhancedDatePickerItem,
-                          dateObj.year === year && styles.enhancedDatePickerItemSelected,
-                        ]}
-                        onPress={() => setDateObj({ ...dateObj, year })}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.enhancedDatePickerItemText,
-                            dateObj.year === year && styles.enhancedDatePickerItemTextSelected,
-                          ]}
-                        >
-                          {year}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-
-                {/* Month Column */}
-                <View style={styles.enhancedDatePickerColumn}>
-                  <Text style={styles.enhancedDateColumnLabel}>Month</Text>
-                  <ScrollView 
-                    style={styles.enhancedDateColumnScroll}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.enhancedDateScrollContent}
-                  >
-                    {months.map((month) => (
-                      <TouchableOpacity
-                        key={month}
-                        style={[
-                          styles.enhancedDatePickerItem,
-                          dateObj.month === month && styles.enhancedDatePickerItemSelected,
-                        ]}
-                        onPress={() => setDateObj({ ...dateObj, month })}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.enhancedDatePickerItemText,
-                            dateObj.month === month && styles.enhancedDatePickerItemTextSelected,
-                          ]}
-                        >
-                          {String(month).padStart(2, "0")}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-
-                {/* Day Column */}
-                <View style={styles.enhancedDatePickerColumn}>
-                  <Text style={styles.enhancedDateColumnLabel}>Day</Text>
-                  <ScrollView 
-                    style={styles.enhancedDateColumnScroll}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.enhancedDateScrollContent}
-                  >
-                    {days.map((day) => (
-                      <TouchableOpacity
-                        key={day}
-                        style={[
-                          styles.enhancedDatePickerItem,
-                          dateObj.day === day && styles.enhancedDatePickerItemSelected,
-                        ]}
-                        onPress={() => setDateObj({ ...dateObj, day })}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.enhancedDatePickerItemText,
-                            dateObj.day === day && styles.enhancedDatePickerItemTextSelected,
-                          ]}
-                        >
-                          {String(day).padStart(2, "0")}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              </View>
-
-              {/* Enhanced Date Confirm Button */}
-              <TouchableOpacity
-                style={styles.enhancedDatePickerConfirmButton}
-                onPress={onConfirm}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={[ThemeColors.primary, ThemeColors.secondary]}
-                  style={styles.enhancedDatePickerConfirmGradient}
-                >
-                  <Icon name="checkmark-circle" size={scale(18)} color="#fff" />
-                  <Text style={styles.enhancedDatePickerConfirmText}>Confirm Date</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
+            </LinearGradient>
+          </View>
         </View>
       </View>
-    </View>
-  ), []);
+    ),
+    []
+  );
 
   return (
     <Modal
@@ -641,14 +750,13 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      <Animated.View
-        style={[
-          styles.modalOverlay,
-          { opacity: fadeAnim }
-        ]}
-      >
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
+
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={styles.modalBackdrop} />
         </TouchableWithoutFeedback>
@@ -656,7 +764,7 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
         <Animated.View
           style={[
             styles.compactModalContainer,
-            { transform: [{ translateY: slideAnim }] }
+            { transform: [{ translateY: slideAnim }] },
           ]}
         >
           <LinearGradient
@@ -667,17 +775,25 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
             <View style={styles.compactModalHeader}>
               <View style={styles.compactHeaderLeft}>
                 <View style={styles.compactHeaderIcon}>
-                  <Icon name="add-circle" size={scale(20)} color={ThemeColors.primary} />
+                  <Icon
+                    name="add-circle"
+                    size={scale(20)}
+                    color={ThemeColors.primary}
+                  />
                 </View>
                 <Text style={styles.compactModalTitle}>Add Activity</Text>
               </View>
-              
+
               <TouchableOpacity
                 style={styles.compactCloseButton}
                 onPress={onClose}
                 activeOpacity={0.7}
               >
-                <Icon name="close" size={scale(18)} color={ThemeColors.textSecondary} />
+                <Icon
+                  name="close"
+                  size={scale(18)}
+                  color={ThemeColors.textSecondary}
+                />
               </TouchableOpacity>
             </View>
 
@@ -691,33 +807,34 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
               {/* Title Input - Compact */}
               <View style={styles.compactFormGroup}>
                 <Text style={styles.compactFormLabel}>Activity Title</Text>
-                <View style={[
-                  styles.compactInputContainer,
-                  errors.title && styles.inputError
-                ]}>
+                <View
+                  style={[
+                    styles.compactInputContainer,
+                    errors.title && styles.inputError,
+                  ]}
+                >
                   <TextInput
-                    style={[
-                      styles.compactInput,
-                      { fontSize: scale(14) * fontSizeMultiplier }
-                    ]}
+                    style={[styles.compactInput, { fontSize: scale(14) }]}
                     placeholder="Enter activity title"
                     placeholderTextColor={ThemeColors.textTertiary}
                     value={newActivity.title}
                     onChangeText={(text) => {
-                      setNewActivity(prev => ({ ...prev, title: text }));
+                      setNewActivity((prev) => ({ ...prev, title: text }));
                       if (errors.title) {
-                        setErrors(prev => ({ ...prev, title: "" }));
+                        setErrors((prev) => ({ ...prev, title: "" }));
                       }
                     }}
                     maxLength={40}
                   />
-                  <Icon 
-                    name="create-outline" 
-                    size={scale(16)} 
-                    color={ThemeColors.textSecondary} 
+                  <Icon
+                    name="create-outline"
+                    size={scale(16)}
+                    color={ThemeColors.textSecondary}
                   />
                 </View>
-                {errors.title && <Text style={styles.compactErrorText}>{errors.title}</Text>}
+                {errors.title && (
+                  <Text style={styles.compactErrorText}>{errors.title}</Text>
+                )}
               </View>
 
               {/* Category Slider - Horizontal */}
@@ -734,17 +851,31 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                       key={category.id}
                       style={[
                         styles.categorySliderItem,
-                        newActivity.category === category.id && styles.categorySliderItemSelected,
-                        { marginRight: index === CATEGORIES.length - 1 ? scale(20) : scale(12) }
+                        newActivity.category === category.id &&
+                          styles.categorySliderItemSelected,
+                        {
+                          marginRight:
+                            index === CATEGORIES.length - 1
+                              ? scale(20)
+                              : scale(12),
+                        },
                       ]}
-                      onPress={() => setNewActivity(prev => ({ ...prev, category: category.id as any }))}
+                      onPress={() =>
+                        setNewActivity((prev) => ({
+                          ...prev,
+                          category: category.id as any,
+                        }))
+                      }
                       activeOpacity={0.8}
                     >
                       <LinearGradient
                         colors={
                           newActivity.category === category.id
                             ? [category.color, `${category.color}CC`]
-                            : ["rgba(255, 255, 255, 0.08)", "rgba(255, 255, 255, 0.04)"]
+                            : [
+                                "rgba(255, 255, 255, 0.08)",
+                                "rgba(255, 255, 255, 0.04)",
+                              ]
                         }
                         style={styles.categorySliderGradient}
                       >
@@ -752,15 +883,16 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                           name={category.icon}
                           size={scale(16)}
                           color={
-                            newActivity.category === category.id 
-                              ? "#fff" 
+                            newActivity.category === category.id
+                              ? "#fff"
                               : ThemeColors.textSecondary
                           }
                         />
                         <Text
                           style={[
                             styles.categorySliderText,
-                            newActivity.category === category.id && styles.categorySliderTextSelected,
+                            newActivity.category === category.id &&
+                              styles.categorySliderTextSelected,
                           ]}
                         >
                           {category.label}
@@ -777,7 +909,7 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.enhancedDurationInputContainer,
-                    errors.duration && styles.inputError
+                    errors.duration && styles.inputError,
                   ]}
                   onPress={() => setShowDurationPicker(true)}
                   activeOpacity={0.8}
@@ -786,12 +918,14 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                     <Text style={styles.enhancedDurationInputValue}>
                       {newActivity.duration || "00:00:00"}
                     </Text>
-                    <Text style={styles.enhancedDurationInputHint}>Tap to select</Text>
+                    <Text style={styles.enhancedDurationInputHint}>
+                      Tap to select
+                    </Text>
                   </View>
-                  <Icon 
-                    name="time-outline" 
-                    size={scale(16)} 
-                    color={ThemeColors.primary} 
+                  <Icon
+                    name="time-outline"
+                    size={scale(16)}
+                    color={ThemeColors.primary}
                   />
                 </TouchableOpacity>
                 {errors.duration ? (
@@ -806,7 +940,10 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                 <Text style={styles.compactFormLabel}>Date Range</Text>
                 <View style={styles.compactDateRangeContainer}>
                   <TouchableOpacity
-                    style={[styles.compactDateInput, errors.startDate && styles.inputError]}
+                    style={[
+                      styles.compactDateInput,
+                      errors.startDate && styles.inputError,
+                    ]}
                     onPress={() => setShowStartDatePicker(true)}
                     activeOpacity={0.8}
                   >
@@ -816,22 +953,25 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                         {newActivity.startDate || "Select"}
                       </Text>
                     </View>
-                    <Icon 
-                      name="calendar-outline" 
-                      size={scale(16)} 
-                      color={ThemeColors.primary} 
+                    <Icon
+                      name="calendar-outline"
+                      size={scale(16)}
+                      color={ThemeColors.primary}
                     />
                   </TouchableOpacity>
 
-                  <Icon 
-                    name="arrow-forward" 
-                    size={scale(14)} 
-                    color={ThemeColors.textSecondary} 
+                  <Icon
+                    name="arrow-forward"
+                    size={scale(14)}
+                    color={ThemeColors.textSecondary}
                     style={styles.compactDateSeparator}
                   />
 
                   <TouchableOpacity
-                    style={[styles.compactDateInput, errors.endDate && styles.inputError]}
+                    style={[
+                      styles.compactDateInput,
+                      errors.endDate && styles.inputError,
+                    ]}
                     onPress={() => setShowEndDatePicker(true)}
                     activeOpacity={0.8}
                   >
@@ -841,10 +981,10 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                         {newActivity.endDate || "Select"}
                       </Text>
                     </View>
-                    <Icon 
-                      name="calendar-outline" 
-                      size={scale(16)} 
-                      color={ThemeColors.primary} 
+                    <Icon
+                      name="calendar-outline"
+                      size={scale(16)}
+                      color={ThemeColors.primary}
                     />
                   </TouchableOpacity>
                 </View>
@@ -869,13 +1009,19 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                       key={color}
                       style={[
                         styles.colorSliderItem,
-                        { 
+                        {
                           backgroundColor: color,
-                          marginRight: index === ACTIVITY_COLORS.length - 1 ? scale(20) : scale(10)
+                          marginRight:
+                            index === ACTIVITY_COLORS.length - 1
+                              ? scale(20)
+                              : scale(10),
                         },
-                        newActivity.color === color && styles.colorSliderItemSelected,
+                        newActivity.color === color &&
+                          styles.colorSliderItemSelected,
                       ]}
-                      onPress={() => setNewActivity(prev => ({ ...prev, color }))}
+                      onPress={() =>
+                        setNewActivity((prev) => ({ ...prev, color }))
+                      }
                       activeOpacity={0.8}
                     >
                       {newActivity.color === color && (
@@ -890,10 +1036,12 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                   <View
                     style={[
                       styles.compactColorPreviewBox,
-                      { backgroundColor: newActivity.color }
+                      { backgroundColor: newActivity.color },
                     ]}
                   />
-                  <Text style={styles.compactColorPreviewText}>{newActivity.color}</Text>
+                  <Text style={styles.compactColorPreviewText}>
+                    {newActivity.color}
+                  </Text>
                 </View>
               </View>
             </ScrollView>
@@ -906,15 +1054,27 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={["rgba(255, 255, 255, 0.1)", "rgba(255, 255, 255, 0.05)"]}
+                  colors={[
+                    "rgba(255, 255, 255, 0.1)",
+                    "rgba(255, 255, 255, 0.05)",
+                  ]}
                   style={styles.compactCancelButtonGradient}
                 >
-                  <Icon name="close-circle-outline" size={scale(16)} color={ThemeColors.textSecondary} />
+                  <Icon
+                    name="close-circle-outline"
+                    size={scale(16)}
+                    color={ThemeColors.textSecondary}
+                  />
                   <Text style={styles.compactCancelButtonText}>Cancel</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
-              <Animated.View style={[styles.compactAddButton, { transform: [{ scale: buttonPulseAnim }] }]}>
+              <Animated.View
+                style={[
+                  styles.compactAddButton,
+                  { transform: [{ scale: buttonPulseAnim }] },
+                ]}
+              >
                 <TouchableOpacity
                   style={styles.compactAddButtonTouchable}
                   onPress={handleAddActivity}
@@ -922,10 +1082,14 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                   activeOpacity={0.9}
                 >
                   <LinearGradient
-                    colors={[ThemeColors.primary, ThemeColors.secondary, ThemeColors.success]}
+                    colors={[
+                      ThemeColors.primary,
+                      ThemeColors.secondary,
+                      ThemeColors.success,
+                    ]}
                     style={[
                       styles.compactAddButtonGradient,
-                      isLoading && styles.compactAddButtonDisabled
+                      isLoading && styles.compactAddButtonDisabled,
                     ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -935,7 +1099,9 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                     ) : (
                       <>
                         <Icon name="rocket" size={scale(18)} color="#fff" />
-                        <Text style={styles.compactAddButtonText}>Create Activity</Text>
+                        <Text style={styles.compactAddButtonText}>
+                          Create Activity
+                        </Text>
                         <View style={styles.addButtonGlow} />
                       </>
                     )}
@@ -950,21 +1116,23 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
         {showDurationPicker && renderDurationPicker()}
 
         {/* Enhanced Date Picker Modals */}
-        {showStartDatePicker && renderCompactDatePicker(
-          true,
-          startDateObj,
-          setStartDateObj,
-          confirmStartDate,
-          () => setShowStartDatePicker(false)
-        )}
+        {showStartDatePicker &&
+          renderCompactDatePicker(
+            true,
+            startDateObj,
+            setStartDateObj,
+            confirmStartDate,
+            () => setShowStartDatePicker(false)
+          )}
 
-        {showEndDatePicker && renderCompactDatePicker(
-          false,
-          endDateObj,
-          setEndDateObj,
-          confirmEndDate,
-          () => setShowEndDatePicker(false)
-        )}
+        {showEndDatePicker &&
+          renderCompactDatePicker(
+            false,
+            endDateObj,
+            setEndDateObj,
+            confirmEndDate,
+            () => setShowEndDatePicker(false)
+          )}
       </Animated.View>
     </Modal>
   );
@@ -1136,7 +1304,7 @@ const styles = StyleSheet.create({
     fontSize: scale(14),
     fontWeight: "600",
     marginBottom: scale(1),
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   enhancedDurationInputHint: {
     color: ThemeColors.textTertiary,
@@ -1227,7 +1395,7 @@ const styles = StyleSheet.create({
     color: ThemeColors.text,
     fontSize: scale(12),
     fontWeight: "600",
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   // Enhanced Footer Styles
   compactModalFooter: {
@@ -1415,7 +1583,7 @@ const styles = StyleSheet.create({
     color: ThemeColors.text,
     fontSize: scale(16),
     fontWeight: "500",
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   enhancedDurationPickerItemTextSelected: {
     color: ThemeColors.success,
@@ -1450,7 +1618,7 @@ const styles = StyleSheet.create({
     color: ThemeColors.text,
     fontSize: scale(18),
     fontWeight: "700",
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
     letterSpacing: 1,
   },
   enhancedDurationPickerConfirmButton: {

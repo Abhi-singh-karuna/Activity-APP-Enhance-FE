@@ -270,12 +270,12 @@ const ActivityScreen = () => {
           priority: 1,
           isRunning: true,
           currentTimer: "00:45:30",
-          remainingSeconds: 2730,
+          remainingSeconds: 10,
           completionPercentage: 25,
           elapsedSeconds: 870,
           totalTimeSpent: 870,
           lastStartTime: Date.now() - 870000,
-          streak: 7,
+          streak: 1,
         },
         {
           id: "2",
@@ -369,8 +369,8 @@ const ActivityScreen = () => {
           id: "6",
           title: "Project Planning",
           category: "Work" as Category,
-          startDate: "2025/08/02",
-          endDate: "2025/08/02",
+          startDate: "2025/08/08",
+          endDate: "2025/08/09",
           duration: "01:15:00",
           color: "#00E5FF",
           priority: 1,
@@ -380,7 +380,7 @@ const ActivityScreen = () => {
           completionPercentage: 0,
           elapsedSeconds: 0,
           totalTimeSpent: 0,
-          streak: 3,
+          streak: 0,
         },
         {
           id: "7",
@@ -397,7 +397,7 @@ const ActivityScreen = () => {
           completionPercentage: 0,
           elapsedSeconds: 0,
           totalTimeSpent: 0,
-          streak: 0,
+          streak: 3,
         },
         {
           id: "8",
@@ -411,10 +411,10 @@ const ActivityScreen = () => {
           isRunning: false,
           currentTimer: "00:45:00",
           remainingSeconds: 2700,
-          completionPercentage: 0,
-          elapsedSeconds: 0,
-          totalTimeSpent: 0,
-          streak: 0,
+          completionPercentage: 10,
+          elapsedSeconds: 10,
+          totalTimeSpent: 10,
+          streak: 9,
         },
       ];
 
@@ -806,7 +806,7 @@ const ActivityScreen = () => {
         );
       }
 
-      return stars;
+      return <>{stars}</>;
     },
     []
   );
