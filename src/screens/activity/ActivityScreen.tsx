@@ -23,6 +23,7 @@ import {
   LayoutAnimation,
   UIManager,
   ScrollView,
+  TextInput,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -68,6 +69,8 @@ interface EnhancedActivity extends Activity {
   completionPercentage?: number;
   streak?: number;
   lastCompletedDate?: string;
+  priorityName?: string;
+  priorityColor?: string;
 }
 
 // Animation configuration
@@ -151,6 +154,23 @@ const ActivityScreen = () => {
     "recent" | "priority" | "duration" | "completion"
   >("recent");
 
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "running" | "completed" | "future" | "paused" | "past"
+  >("all");
+  const [filterPriority, setFilterPriority] = useState<number | null>(null);
+  const [filterDateRange, setFilterDateRange] = useState<{
+    start: string | null;
+    end: string | null;
+  }>({ start: null, end: null });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStreak, setFilterStreak] = useState<number | null>(null);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [analyticsMode, setAnalyticsMode] = useState<"completion" | "time">(
+    "completion"
+  );
+
   // Enhanced animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -176,6 +196,10 @@ const ActivityScreen = () => {
     return `${year}/${month}/${day}`;
   }, []);
 
+  const getCurrentDate = useCallback((): string => {
+    return formatDate(new Date());
+  }, [formatDate]);
+
   const timeToSeconds = useCallback((time: string): number => {
     const [hours, minutes, seconds] = time.split(":").map(Number);
     return hours * 3600 + minutes * 60 + seconds;
@@ -191,15 +215,201 @@ const ActivityScreen = () => {
     )}:${String(remainingSeconds).padStart(2, "0")}`;
   }, []);
 
+  // Enhanced date comparison functions
   const isActivityInFuture = useCallback(
     (activity: EnhancedActivity): boolean => {
-      if (activity.isFuture === true) return true;
-      const today = new Date();
+      const currentDate = new Date();
       const startDate = new Date(activity.startDate.replace(/\//g, "-"));
-      return startDate > today;
+      startDate.setHours(0, 0, 0, 0);
+      currentDate.setHours(0, 0, 0, 0);
+      return startDate > currentDate;
     },
     []
   );
+
+  const isActivityInPast = useCallback(
+    (activity: EnhancedActivity): boolean => {
+      const currentDate = new Date();
+      const endDate = new Date(activity.endDate.replace(/\//g, "-"));
+      endDate.setHours(23, 59, 59, 999);
+      currentDate.setHours(0, 0, 0, 0);
+      return endDate < currentDate;
+    },
+    []
+  );
+
+  const isActivityActive = useCallback(
+    (activity: EnhancedActivity): boolean => {
+      const currentDate = new Date();
+      const startDate = new Date(activity.startDate.replace(/\//g, "-"));
+      const endDate = new Date(activity.endDate.replace(/\//g, "-"));
+
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      currentDate.setHours(0, 0, 0, 0);
+
+      return currentDate >= startDate && currentDate <= endDate;
+    },
+    []
+  );
+
+  const canStartActivity = useCallback(
+    (activity: EnhancedActivity): boolean => {
+      return isActivityActive(activity) && !activity.isCompleted;
+    },
+    [isActivityActive]
+  );
+
+  // Filter functions
+  const getFilteredActivities = useCallback(() => {
+    let filtered = [...activities];
+
+    // Category filter
+    if (filterCategory) {
+      filtered = filtered.filter(
+        (activity) => activity.category === filterCategory
+      );
+    }
+
+    // Status filter
+    if (filterStatus !== "all") {
+      switch (filterStatus) {
+        case "running":
+          filtered = filtered.filter((activity) => activity.isRunning);
+          break;
+        case "completed":
+          filtered = filtered.filter((activity) => activity.isCompleted);
+          break;
+        case "future":
+          filtered = filtered.filter((activity) =>
+            isActivityInFuture(activity)
+          );
+          break;
+        case "paused":
+          filtered = filtered.filter((activity) => activity.isPaused);
+          break;
+        case "past":
+          filtered = filtered.filter(
+            (activity) => isActivityInPast(activity) && !activity.isCompleted
+          );
+          break;
+      }
+    }
+
+    // Priority filter
+    if (filterPriority !== null) {
+      filtered = filtered.filter(
+        (activity) => activity.priority === filterPriority
+      );
+    }
+
+    // Date range filter
+    if (filterDateRange.start || filterDateRange.end) {
+      filtered = filtered.filter((activity) => {
+        const activityDate = new Date(activity.startDate.replace(/\//g, "-"));
+        const startDate = filterDateRange.start
+          ? new Date(filterDateRange.start.replace(/\//g, "-"))
+          : null;
+        const endDate = filterDateRange.end
+          ? new Date(filterDateRange.end.replace(/\//g, "-"))
+          : null;
+
+        if (startDate && endDate) {
+          return activityDate >= startDate && activityDate <= endDate;
+        } else if (startDate) {
+          return activityDate >= startDate;
+        } else if (endDate) {
+          return activityDate <= endDate;
+        }
+        return true;
+      });
+    }
+
+    // Search query filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (activity) =>
+          activity.title.toLowerCase().includes(query) ||
+          activity.category.toLowerCase().includes(query)
+      );
+    }
+
+    // Streak filter
+    if (filterStreak !== null) {
+      filtered = filtered.filter(
+        (activity) => (activity.streak || 0) >= filterStreak
+      );
+    }
+
+    // Sort activities
+    switch (sortBy) {
+      case "priority":
+        filtered.sort((a, b) => a.priority - b.priority);
+        break;
+      case "duration":
+        filtered.sort(
+          (a, b) => timeToSeconds(b.duration) - timeToSeconds(a.duration)
+        );
+        break;
+      case "completion":
+        filtered.sort(
+          (a, b) =>
+            (b.completionPercentage || 0) - (a.completionPercentage || 0)
+        );
+        break;
+      case "recent":
+      default:
+        filtered.sort(
+          (a, b) =>
+            new Date(b.startDate.replace(/\//g, "-")).getTime() -
+            new Date(a.startDate.replace(/\//g, "-")).getTime()
+        );
+        break;
+    }
+
+    return filtered;
+  }, [
+    activities,
+    filterCategory,
+    filterStatus,
+    filterPriority,
+    filterDateRange,
+    searchQuery,
+    filterStreak,
+    sortBy,
+    isActivityInFuture,
+    isActivityInPast,
+    timeToSeconds,
+  ]);
+
+  const clearAllFilters = useCallback(() => {
+    setFilterCategory(null);
+    setFilterStatus("all");
+    setFilterPriority(null);
+    setFilterDateRange({ start: null, end: null });
+    setSearchQuery("");
+    setFilterStreak(null);
+    setSortBy("recent");
+  }, []);
+
+  const getActiveFiltersCount = useCallback(() => {
+    let count = 0;
+    if (filterCategory) count++;
+    if (filterStatus !== "all") count++;
+    if (filterPriority !== null) count++;
+    if (filterDateRange.start || filterDateRange.end) count++;
+    if (searchQuery.trim()) count++;
+    if (filterStreak !== null) count++;
+    return count;
+  }, [
+    filterCategory,
+    filterStatus,
+    filterPriority,
+    filterDateRange,
+    searchQuery,
+    filterStreak,
+  ]);
 
   // Enhanced initialization animations
   const initializeAnimations = useCallback(() => {
@@ -258,164 +468,184 @@ const ActivityScreen = () => {
   const loadActivities = useCallback(async () => {
     try {
       setIsLoading(true);
+      const currentDate = getCurrentDate();
+
       // Sample activities with different states
       const sampleActivities: EnhancedActivity[] = [
+        // PAST COMPLETED ACTIVITY (with visible streak)
         {
           id: "1",
           title: "Morning Workout",
           category: "Workout" as Category,
-          startDate: "2025/08/02",
-          endDate: "2025/08/02",
+          startDate: "2025/01/15",
+          endDate: "2025/01/15",
           duration: "01:00:00",
           color: "#00E5FF",
           priority: 1,
-          isRunning: true,
-          currentTimer: "00:45:30",
-          remainingSeconds: 100,
-          completionPercentage: 25,
-          elapsedSeconds: 870,
-          totalTimeSpent: 870,
-          lastStartTime: Date.now() - 870000,
-          streak: 1,
+          priorityName: "High",
+          priorityColor: "#FF4757",
+          isCompleted: true,
+          isRunning: false,
+          currentTimer: "00:00:00",
+          remainingSeconds: 0,
+          completionPercentage: 100,
+          elapsedSeconds: 3600,
+          totalTimeSpent: 3600,
+          streak: 7,
+          lastCompletedDate: "2025/01/15",
         },
+        // ONGOING ACTIVITY (current date)
         {
           id: "2",
           title: "Team Meeting",
           category: "Work" as Category,
-          startDate: "2025/08/02",
-          endDate: "2025/08/02",
+          startDate: currentDate,
+          endDate: currentDate,
           duration: "00:30:00",
           color: "#9C6CDA",
           priority: 2,
+          priorityName: "Medium",
+          priorityColor: "#FF9500",
           isRunning: true,
+          isCompleted: false,
           currentTimer: "00:25:00",
           remainingSeconds: 1500,
           completionPercentage: 17,
           elapsedSeconds: 300,
           totalTimeSpent: 300,
-          streak: 12,
-        },
-        {
-          id: "3",
-          title: "Read Book",
-          category: "Personal" as Category,
-          startDate: "2025/08/01",
-          endDate: "2025/08/01",
-          duration: "00:45:00",
-          color: "#4ECDC4",
-          priority: 3,
-          isCompleted: true,
-          currentTimer: "00:00:00",
-          remainingSeconds: 0,
-          completionPercentage: 100,
-          elapsedSeconds: 2700,
-          totalTimeSpent: 2700,
-          streak: 1,
-          lastCompletedDate: "2025/08/01",
-        },
-        {
-          id: "4",
-          title: "Learn React Native",
-          category: "Personal" as Category,
-          startDate: "2025/08/02",
-          endDate: "2025/08/02",
-          duration: "02:00:00",
-          color: "#FF9500",
-          priority: 2,
-          isPaused: true,
-          isRunning: false,
-          currentTimer: "01:30:45",
-          remainingSeconds: 5445,
-          completionPercentage: 24,
-          elapsedSeconds: 1755,
-          totalTimeSpent: 1755,
+          lastStartTime: Date.now() - 300000,
           streak: 3,
         },
+        // UPCOMING ACTIVITY (future date)
         {
-          id: "9",
-          title: "Daily Meditation",
-          category: "Personal" as Category,
-          startDate: "2025/08/01",
-          endDate: "2025/08/01",
-          duration: "00:20:00",
-          color: "#9C6CDA",
-          priority: 1,
-          isCompleted: true,
-          currentTimer: "00:00:00",
-          remainingSeconds: 0,
-          completionPercentage: 100,
-          elapsedSeconds: 1200,
-          totalTimeSpent: 1200,
-          streak: 5,
-          lastCompletedDate: "2025/08/01",
-        },
-        {
-          id: "5",
+          id: "3",
           title: "Gym Session",
           category: "Workout" as Category,
-          startDate: "2025/08/03",
-          endDate: "2025/08/03",
+          startDate: "2025/01/20",
+          endDate: "2025/01/20",
           duration: "01:30:00",
           color: "#FF4757",
           priority: 1,
+          priorityName: "High",
+          priorityColor: "#FF4757",
+          isRunning: false,
+          isCompleted: false,
           isFuture: true,
           currentTimer: "01:30:00",
           remainingSeconds: 5400,
           completionPercentage: 0,
           elapsedSeconds: 0,
           totalTimeSpent: 0,
-          streak: 8,
+          streak: 5,
         },
+        // ADDITIONAL PAST COMPLETED ACTIVITY
         {
-          id: "6",
-          title: "Project Planning",
-          category: "Work" as Category,
-          startDate: "2025/08/08",
-          endDate: "2025/08/09",
-          duration: "01:15:00",
-          color: "#00E5FF",
-          priority: 1,
-          isRunning: false,
-          currentTimer: "01:15:00",
-          remainingSeconds: 4500,
-          completionPercentage: 0,
-          elapsedSeconds: 0,
-          totalTimeSpent: 0,
-          streak: 0,
-        },
-        {
-          id: "7",
-          title: "Meditation",
+          id: "4",
+          title: "Read Book",
           category: "Personal" as Category,
-          startDate: "2025/08/02",
-          endDate: "2025/08/02",
-          duration: "00:20:00",
-          color: "#9C6CDA",
-          priority: 3,
-          isRunning: false,
-          currentTimer: "00:20:00",
-          remainingSeconds: 1200,
-          completionPercentage: 0,
-          elapsedSeconds: 0,
-          totalTimeSpent: 0,
-          streak: 3,
-        },
-        {
-          id: "8",
-          title: "Code Review",
-          category: "Work" as Category,
-          startDate: "2025/08/02",
-          endDate: "2025/08/02",
+          startDate: "2025/01/10",
+          endDate: "2025/01/10",
           duration: "00:45:00",
           color: "#4ECDC4",
-          priority: 2,
+          priority: 3,
+          priorityName: "Low",
+          priorityColor: "#4ECDC4",
+          isCompleted: true,
           isRunning: false,
+          currentTimer: "00:00:00",
+          remainingSeconds: 0,
+          completionPercentage: 100,
+          elapsedSeconds: 2700,
+          totalTimeSpent: 2700,
+          streak: 12,
+          lastCompletedDate: "2025/01/10",
+        },
+        // ADDITIONAL ONGOING ACTIVITY (current date)
+        {
+          id: "5",
+          title: "Learn React Native",
+          category: "Personal" as Category,
+          startDate: currentDate,
+          endDate: currentDate,
+          duration: "02:00:00",
+          color: "#FF9500",
+          priority: 2,
+          priorityName: "Medium",
+          priorityColor: "#FF9500",
+          isRunning: true,
+          isCompleted: false,
+          currentTimer: "01:30:45",
+          remainingSeconds: 5445,
+          completionPercentage: 24,
+          elapsedSeconds: 1755,
+          totalTimeSpent: 1755,
+          lastStartTime: Date.now() - 1755000,
+          streak: 8,
+        },
+        // FUTURE ACTIVITY (next week)
+        {
+          id: "6",
+          title: "Project Review",
+          category: "Work" as Category,
+          startDate: "2025/01/25",
+          endDate: "2025/01/25",
+          duration: "01:00:00",
+          color: "#9C6CDA",
+          priority: 1,
+          priorityName: "High",
+          priorityColor: "#FF4757",
+          isRunning: false,
+          isCompleted: false,
+          isFuture: true,
+          currentTimer: "01:00:00",
+          remainingSeconds: 3600,
+          completionPercentage: 0,
+          elapsedSeconds: 0,
+          totalTimeSpent: 0,
+          streak: 2,
+        },
+        // ADDITIONAL FUTURE ACTIVITY (with high streak)
+        {
+          id: "7",
+          title: "Weekly Planning",
+          category: "Personal" as Category,
+          startDate: "2025/09/28",
+          endDate: "2025/09/28",
+          duration: "00:45:00",
+          color: "#FF9500",
+          priority: 2,
+          priorityName: "Medium",
+          priorityColor: "#FF9500",
+          isRunning: false,
+          isCompleted: false,
+          isFuture: true,
           currentTimer: "00:45:00",
           remainingSeconds: 2700,
-          completionPercentage: 10,
-          elapsedSeconds: 10,
-          totalTimeSpent: 10,
-          streak: 9,
+          completionPercentage: 0,
+          elapsedSeconds: 0,
+          totalTimeSpent: 0,
+          streak: 15,
+        },
+        // EXPIRED ACTIVITY (with streak)
+        {
+          id: "8",
+          title: "Daily Meditation",
+          category: "Personal" as Category,
+          startDate: "2025/01/05",
+          endDate: "2025/01/05",
+          duration: "00:30:00",
+          color: "#4ECDC4",
+          priority: 1,
+          priorityName: "High",
+          priorityColor: "#FF4757",
+          isRunning: false,
+          isCompleted: false,
+          currentTimer: "00:30:00",
+          remainingSeconds: 1800,
+          completionPercentage: 0,
+          elapsedSeconds: 0,
+          totalTimeSpent: 0,
+          streak: 8,
         },
       ];
 
@@ -426,7 +656,7 @@ const ActivityScreen = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [getCurrentDate]);
 
   // Enhanced refresh functionality
   const onRefresh = useCallback(async () => {
@@ -477,12 +707,21 @@ const ActivityScreen = () => {
     };
   }, [activities, pulseAnim]);
 
-  // Enhanced timer functionality
+  // Enhanced timer functionality with date validation
   const toggleTimer = useCallback(
     async (id: string) => {
       try {
         const activity = activities.find((a) => a.id === id);
         if (!activity) return;
+
+        // Check if activity can be started based on date
+        if (!canStartActivity(activity)) {
+          Alert.alert(
+            "Cannot Start Activity",
+            "This activity cannot be started outside its scheduled date range."
+          );
+          return;
+        }
 
         const newIsRunning = !activity.isRunning;
 
@@ -511,7 +750,7 @@ const ActivityScreen = () => {
         Alert.alert("Error", "Failed to update timer. Please try again.");
       }
     },
-    [activities]
+    [activities, canStartActivity]
   );
 
   // Enhanced timer update logic
@@ -710,32 +949,8 @@ const ActivityScreen = () => {
 
   // Filtered and sorted activities
   const filteredAndSortedActivities = useMemo(() => {
-    let filtered = activities;
-
-    if (filterCategory) {
-      filtered = filtered.filter(
-        (activity) => activity.category === filterCategory
-      );
-    }
-
-    return filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "priority":
-          return (a.priority || 0) - (b.priority || 0);
-        case "duration":
-          return (
-            timeToSeconds(b.duration || "00:00:00") -
-            timeToSeconds(a.duration || "00:00:00")
-          );
-        case "completion":
-          return (b.completionPercentage || 0) - (a.completionPercentage || 0);
-        default:
-          return (
-            new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-          );
-      }
-    });
-  }, [activities, filterCategory, sortBy, timeToSeconds]);
+    return getFilteredActivities();
+  }, [getFilteredActivities]);
 
   // Statistics calculations
   const stats = useMemo(() => {
@@ -758,6 +973,11 @@ const ActivityScreen = () => {
           : 0,
     };
   }, [activities, formatTimeHHMMSS]);
+
+  const noActiveFilters = useMemo(
+    () => getActiveFiltersCount() === 0,
+    [getActiveFiltersCount]
+  );
 
   // Helper function to render streak stars
   const renderStreakStars = useCallback(
@@ -816,9 +1036,13 @@ const ActivityScreen = () => {
   const renderActivityItem = useCallback(
     ({ item, index }: { item: EnhancedActivity; index: number }) => {
       const isFuture = isActivityInFuture(item);
+      const isPast = isActivityInPast(item);
+      const isActive = isActivityActive(item);
+      const canStart = canStartActivity(item);
       const isLongPressed = longPressedId === item.id;
       const showDeleteUI = isLongPressed && deleteReady;
       const isCompleted = item.isCompleted;
+      const currentDate = getCurrentDate();
 
       return (
         <Animated.View
@@ -890,12 +1114,39 @@ const ActivityScreen = () => {
                   {/* Header Row: Title, Category, and Control Button */}
                   <View style={styles.cardHeader}>
                     <View style={styles.titleSection}>
-                      <Text style={styles.activityTitle} numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                      {isFuture && (
-                        <Text style={styles.scheduledText}>Scheduled</Text>
-                      )}
+                      {/* Activity Title with Priority */}
+                      <View style={styles.cardTitleRow}>
+                        <Text style={styles.activityTitle} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        {item.priorityName && (
+                          <>
+                            <Text style={styles.separator}> | </Text>
+                            <Text
+                              style={[
+                                styles.priorityText,
+                                { color: item.priorityColor },
+                              ]}
+                            >
+                              {item.priorityName}
+                            </Text>
+                          </>
+                        )}
+                      </View>
+
+                      {/* Date Range Display */}
+                      <View style={styles.dateRangeContainer}>
+                        <Icon
+                          name="calendar-outline"
+                          size={scale(9)}
+                          color="#B0B0B0"
+                        />
+                        <Text style={styles.dateRangeText}>
+                          {item.startDate}
+                          {item.startDate !== item.endDate &&
+                            ` → ${item.endDate}`}
+                        </Text>
+                      </View>
                     </View>
 
                     <View style={styles.headerRight}>
@@ -917,7 +1168,48 @@ const ActivityScreen = () => {
 
                       {/* Control Button */}
                       <View style={styles.controlSection}>
-                        {!isFuture && !isCompleted && (
+                        {isPast && !isCompleted && (
+                          <TouchableOpacity
+                            style={styles.pastButton}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              // Navigate to calendar or show past activity details
+                              Alert.alert(
+                                "Past Activity",
+                                "This activity was scheduled for the past and cannot be started."
+                              );
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Icon
+                              name="calendar"
+                              size={scale(14.4)}
+                              color="#FF4757"
+                            />
+                          </TouchableOpacity>
+                        )}
+
+                        {isFuture && (
+                          <TouchableOpacity
+                            style={styles.futureButton}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              Alert.alert(
+                                "Future Activity",
+                                "This activity is scheduled for the future."
+                              );
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Icon
+                              name="time-outline"
+                              size={scale(14.4)}
+                              color="#666666"
+                            />
+                          </TouchableOpacity>
+                        )}
+
+                        {isActive && !isCompleted && canStart && (
                           <TouchableOpacity
                             style={[
                               styles.controlButton,
@@ -938,7 +1230,7 @@ const ActivityScreen = () => {
                             >
                               <Icon
                                 name={item.isRunning ? "pause" : "play"}
-                                size={scale(16)}
+                                size={scale(14.4)}
                                 color="#000000"
                               />
                             </Animated.View>
@@ -949,18 +1241,8 @@ const ActivityScreen = () => {
                           <View style={styles.completedButton}>
                             <Icon
                               name="checkmark-circle"
-                              size={scale(24)}
+                              size={scale(21.6)}
                               color="#4ECDC4"
-                            />
-                          </View>
-                        )}
-
-                        {isFuture && (
-                          <View style={styles.futureButton}>
-                            <Icon
-                              name="time-outline"
-                              size={scale(20)}
-                              color="#666666"
                             />
                           </View>
                         )}
@@ -971,7 +1253,7 @@ const ActivityScreen = () => {
                   {/* Main Content Row: Timer/Status and Duration */}
                   <View style={styles.cardMainContent}>
                     <View style={styles.leftContent}>
-                      {!isFuture && !isCompleted && (
+                      {isActive && !isCompleted && (
                         <View style={styles.timerSection}>
                           <Text style={styles.timerValue}>
                             {item.currentTimer}
@@ -985,7 +1267,7 @@ const ActivityScreen = () => {
                           <View style={styles.congratsRow}>
                             <Icon
                               name="trophy"
-                              size={scale(14)}
+                              size={scale(12.6)}
                               color="#4ECDC4"
                             />
                             <Text style={styles.congratsText}>Completed!</Text>
@@ -1021,11 +1303,28 @@ const ActivityScreen = () => {
                           )}
                         </View>
                       )}
+
+                      {isPast && !isCompleted && (
+                        <View style={styles.pastSection}>
+                          <Text style={styles.pastLabel}>Expired</Text>
+                          <Text style={styles.pastDate}>{item.endDate}</Text>
+                          {item.streak && item.streak > 0 && (
+                            <View style={styles.pastStreakContainer}>
+                              <Text style={styles.pastStreakLabel}>
+                                Previous streak
+                              </Text>
+                              <View style={styles.pastStreakStarsRow}>
+                                {renderStreakStars(item.streak, true, false)}
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      )}
                     </View>
 
                     <View style={styles.rightContent}>
                       <Text style={styles.durationText}>{item.duration}</Text>
-                      {!isFuture &&
+                      {isActive &&
                         !isCompleted &&
                         item.streak &&
                         item.streak > 0 && (
@@ -1041,10 +1340,10 @@ const ActivityScreen = () => {
                     </View>
                   </View>
 
-                  {/* Bottom Row: Progress Bar and Dates */}
+                  {/* Bottom Row: Progress Bar, Streak, and Current Date */}
                   <View style={styles.cardFooter}>
                     <View style={styles.progressSection}>
-                      {!isFuture &&
+                      {isActive &&
                         item.completionPercentage !== undefined &&
                         item.completionPercentage > 0 && (
                           <View style={styles.progressContainer}>
@@ -1070,11 +1369,42 @@ const ActivityScreen = () => {
                         )}
                     </View>
 
-                    <View style={styles.dateSection}>
-                      <Text style={styles.dateText}>{item.startDate}</Text>
-                      {item.startDate !== item.endDate && (
-                        <Text style={styles.dateText}>→ {item.endDate}</Text>
-                      )}
+                    {/* Inline Streak and Current Date */}
+                    <View style={styles.footerRightSection}>
+                      {/* Streak Display - Only for completed and expired activities */}
+                      {(isCompleted || isPast) &&
+                        item.streak &&
+                        item.streak > 0 && (
+                          <View style={styles.inlineStreakContainer}>
+                            <Icon
+                              name="star"
+                              size={scale(8)}
+                              color={isCompleted ? "#FFD700" : "#FFD700"}
+                            />
+                            <Text
+                              style={[
+                                styles.inlineStreakText,
+                                {
+                                  color: isCompleted ? "#FFD700" : "#FFD700",
+                                },
+                              ]}
+                            >
+                              {item.streak}
+                            </Text>
+                          </View>
+                        )}
+
+                      {/* Current Date */}
+                      <View style={styles.currentDateSection}>
+                        <Icon
+                          name="today-outline"
+                          size={scale(8)}
+                          color="#B0B0B0"
+                        />
+                        <Text style={styles.currentDateText}>
+                          {currentDate}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -1086,6 +1416,9 @@ const ActivityScreen = () => {
     },
     [
       isActivityInFuture,
+      isActivityInPast,
+      isActivityActive,
+      canStartActivity,
       longPressedId,
       deleteReady,
       fadeAnim,
@@ -1097,6 +1430,7 @@ const ActivityScreen = () => {
       showDeleteConfirmation,
       toggleTimer,
       pulseAnim,
+      getCurrentDate,
     ]
   );
 
@@ -1154,8 +1488,99 @@ const ActivityScreen = () => {
           ]}
         >
           <View style={styles.titleContainer}>
-            <Text style={styles.mainTitle}>Activity Hub</Text>
-            <Text style={styles.subtitle}>Track & Manage Your Activities</Text>
+            {!showSearchModal ? (
+              <>
+                <View style={styles.titleRow}>
+                  <Text style={styles.mainTitle}>Activity Hub</Text>
+                  <View style={styles.titleButtonsContainer}>
+                    <TouchableOpacity
+                      style={styles.floatingSearchButton}
+                      onPress={() => {
+                        setShowSearchModal(true);
+                        setShowFilters(false);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={[
+                          "rgba(0, 229, 255, 0.2)",
+                          "rgba(0, 229, 255, 0.1)",
+                        ]}
+                        style={styles.floatingSearchGradient}
+                      >
+                        <Icon name="search" size={scale(16)} color="#00E5FF" />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.floatingFilterButton}
+                      onPress={() => {
+                        setShowFilters(!showFilters);
+                        setShowSearchModal(false);
+                        setSearchQuery("");
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={[
+                          showFilters
+                            ? "rgba(156, 108, 218, 0.3)"
+                            : "rgba(156, 108, 218, 0.2)",
+                          showFilters
+                            ? "rgba(156, 108, 218, 0.2)"
+                            : "rgba(156, 108, 218, 0.1)",
+                        ]}
+                        style={styles.floatingFilterGradient}
+                      >
+                        <Icon
+                          name="filter"
+                          size={scale(16)}
+                          color={showFilters ? "#9C6CDA" : "#9C6CDA"}
+                        />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <Text style={styles.subtitle}>
+                  Track & Manage Your Activities
+                </Text>
+              </>
+            ) : (
+              <View style={styles.searchExpandedContainer}>
+                <View style={styles.searchExpandedInputContainer}>
+                  <Icon name="search" size={scale(18)} color="#00E5FF" />
+                  <TextInput
+                    style={styles.searchExpandedInput}
+                    placeholder="Search activities..."
+                    placeholderTextColor="#B0B0B0"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoFocus={true}
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setSearchQuery("")}
+                      style={styles.searchExpandedClearButton}
+                    >
+                      <Icon
+                        name="close-circle"
+                        size={scale(16)}
+                        color="#B0B0B0"
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={styles.searchExpandedCloseButton}
+                  onPress={() => {
+                    setShowSearchModal(false);
+                    setSearchQuery("");
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="close" size={scale(20)} color="#B0B0B0" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Action Buttons Row */}
@@ -1219,6 +1644,195 @@ const ActivityScreen = () => {
           </View>
         </Animated.View>
 
+        {/* Filter Dropdown */}
+        {showFilters && (
+          <Animated.View
+            style={[
+              styles.filterDropdownContainer,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  {
+                    translateY: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={["rgba(30, 30, 30, 0.95)", "rgba(44, 44, 46, 0.9)"]}
+              style={styles.filterDropdownGradient}
+            >
+              {/* Category Filter */}
+              <View style={styles.filterDropdownSection}>
+                <Text style={styles.filterDropdownTitle}>Category</Text>
+                <View style={styles.filterDropdownChips}>
+                  {["All", "Workout", "Work", "Personal"].map((category) => (
+                    <TouchableOpacity
+                      key={category}
+                      style={[
+                        styles.filterDropdownChip,
+                        filterCategory ===
+                          (category === "All"
+                            ? null
+                            : (category as Category)) &&
+                          styles.filterDropdownChipActive,
+                      ]}
+                      onPress={() =>
+                        setFilterCategory(
+                          category === "All" ? null : (category as Category)
+                        )
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.filterDropdownChipText,
+                          filterCategory ===
+                            (category === "All"
+                              ? null
+                              : (category as Category)) &&
+                            styles.filterDropdownChipTextActive,
+                        ]}
+                      >
+                        {category}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Status Filter */}
+              <View style={styles.filterDropdownSection}>
+                <Text style={styles.filterDropdownTitle}>Status</Text>
+                <View style={styles.filterDropdownChips}>
+                  {[
+                    { label: "All", value: "all" },
+                    { label: "Running", value: "running" },
+                    { label: "Completed", value: "completed" },
+                    { label: "Past", value: "past" },
+                    { label: "Future", value: "future" },
+                    { label: "Paused", value: "paused" },
+                  ].map((status) => (
+                    <TouchableOpacity
+                      key={status.value}
+                      style={[
+                        styles.filterDropdownChip,
+                        filterStatus === status.value &&
+                          styles.filterDropdownChipActive,
+                      ]}
+                      onPress={() => setFilterStatus(status.value as any)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterDropdownChipText,
+                          filterStatus === status.value &&
+                            styles.filterDropdownChipTextActive,
+                        ]}
+                      >
+                        {status.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Priority & Sort Row */}
+              <View style={styles.filterDropdownRow}>
+                {/* Priority Filter */}
+                <View style={styles.filterDropdownHalfSection}>
+                  <Text style={styles.filterDropdownTitle}>Priority</Text>
+                  <View style={styles.filterDropdownChips}>
+                    {[
+                      { label: "All", value: null },
+                      { label: "High", value: 1 },
+                      { label: "Medium", value: 2 },
+                      { label: "Low", value: 3 },
+                    ].map((priority) => (
+                      <TouchableOpacity
+                        key={priority.value || "all"}
+                        style={[
+                          styles.filterDropdownChip,
+                          filterPriority === priority.value &&
+                            styles.filterDropdownChipActive,
+                        ]}
+                        onPress={() => setFilterPriority(priority.value)}
+                      >
+                        <Text
+                          style={[
+                            styles.filterDropdownChipText,
+                            filterPriority === priority.value &&
+                              styles.filterDropdownChipTextActive,
+                          ]}
+                        >
+                          {priority.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Sort Options */}
+                <View style={styles.filterDropdownHalfSection}>
+                  <Text style={styles.filterDropdownTitle}>Sort By</Text>
+                  <View style={styles.filterDropdownChips}>
+                    {[
+                      { label: "Recent", value: "recent" },
+                      { label: "Priority", value: "priority" },
+                      { label: "Duration", value: "duration" },
+                      { label: "Completion", value: "completion" },
+                    ].map((sort) => (
+                      <TouchableOpacity
+                        key={sort.value}
+                        style={[
+                          styles.filterDropdownChip,
+                          sortBy === sort.value &&
+                            styles.filterDropdownChipActive,
+                        ]}
+                        onPress={() => setSortBy(sort.value as any)}
+                      >
+                        <Text
+                          style={[
+                            styles.filterDropdownChipText,
+                            sortBy === sort.value &&
+                              styles.filterDropdownChipTextActive,
+                          ]}
+                        >
+                          {sort.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              {/* Clear Filters Button */}
+              {getActiveFiltersCount() > 0 && (
+                <TouchableOpacity
+                  style={styles.filterDropdownClearButton}
+                  onPress={clearAllFilters}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={[
+                      "rgba(255, 71, 87, 0.2)",
+                      "rgba(255, 107, 157, 0.1)",
+                    ]}
+                    style={styles.filterDropdownClearGradient}
+                  >
+                    <Icon name="refresh" size={scale(14)} color="#FF4757" />
+                    <Text style={styles.filterDropdownClearText}>
+                      Clear All Filters
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </LinearGradient>
+          </Animated.View>
+        )}
+
         {/* Compact Analytics Section */}
         <Animated.View
           style={[
@@ -1235,7 +1849,12 @@ const ActivityScreen = () => {
           >
             <View style={styles.compactStatsRow}>
               {/* Total Activities */}
-              <View style={styles.compactStatItem}>
+              <TouchableOpacity
+                style={styles.compactStatItem}
+                activeOpacity={0.8}
+                onPress={clearAllFilters}
+                accessibilityLabel="Show all activities"
+              >
                 <View
                   style={[
                     styles.compactStatIcon,
@@ -1244,12 +1863,31 @@ const ActivityScreen = () => {
                 >
                   <Icon name="grid-outline" size={scale(14)} color="#B0B0B0" />
                 </View>
-                <Text style={styles.compactStatNumber}>{stats.total}</Text>
-                <Text style={styles.compactStatLabel}>Total</Text>
-              </View>
+                <Text
+                  style={[
+                    styles.compactStatNumber,
+                    { color: noActiveFilters ? "#FFFFFF" : "#B0B0B0" },
+                  ]}
+                >
+                  {stats.total}
+                </Text>
+                <Text
+                  style={[
+                    styles.compactStatLabel,
+                    { color: noActiveFilters ? "#FFFFFF" : "#B0B0B0" },
+                  ]}
+                >
+                  Total
+                </Text>
+              </TouchableOpacity>
 
               {/* Active */}
-              <View style={styles.compactStatItem}>
+              <TouchableOpacity
+                style={styles.compactStatItem}
+                activeOpacity={0.8}
+                onPress={() => setFilterStatus("running")}
+                accessibilityLabel="Filter running activities"
+              >
                 <View
                   style={[
                     styles.compactStatIcon,
@@ -1258,16 +1896,35 @@ const ActivityScreen = () => {
                 >
                   <Icon name="play-circle" size={scale(14)} color="#00E5FF" />
                 </View>
-                <Text style={[styles.compactStatNumber, { color: "#00E5FF" }]}>
+                <Text
+                  style={[
+                    styles.compactStatNumber,
+                    {
+                      color: filterStatus === "running" ? "#00E5FF" : "#B0B0B0",
+                    },
+                  ]}
+                >
                   {stats.running}
                 </Text>
-                <Text style={[styles.compactStatLabel, { color: "#00E5FF" }]}>
+                <Text
+                  style={[
+                    styles.compactStatLabel,
+                    {
+                      color: filterStatus === "running" ? "#00E5FF" : "#B0B0B0",
+                    },
+                  ]}
+                >
                   Active
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               {/* Completed */}
-              <View style={styles.compactStatItem}>
+              <TouchableOpacity
+                style={styles.compactStatItem}
+                activeOpacity={0.8}
+                onPress={() => setFilterStatus("completed")}
+                accessibilityLabel="Filter completed activities"
+              >
                 <View
                   style={[
                     styles.compactStatIcon,
@@ -1280,16 +1937,42 @@ const ActivityScreen = () => {
                     color="#4ECDC4"
                   />
                 </View>
-                <Text style={[styles.compactStatNumber, { color: "#4ECDC4" }]}>
+                <Text
+                  style={[
+                    styles.compactStatNumber,
+                    {
+                      color:
+                        filterStatus === "completed" ? "#4ECDC4" : "#B0B0B0",
+                    },
+                  ]}
+                >
                   {stats.completed}
                 </Text>
-                <Text style={[styles.compactStatLabel, { color: "#4ECDC4" }]}>
+                <Text
+                  style={[
+                    styles.compactStatLabel,
+                    {
+                      color:
+                        filterStatus === "completed" ? "#4ECDC4" : "#B0B0B0",
+                    },
+                  ]}
+                >
                   Done
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               {/* Success Rate */}
-              <View style={styles.compactStatItem}>
+              <TouchableOpacity
+                style={styles.compactStatItem}
+                activeOpacity={0.8}
+                onPress={() => setSortBy("completion")}
+                onLongPress={() =>
+                  setAnalyticsMode((m) =>
+                    m === "completion" ? "time" : "completion"
+                  )
+                }
+                accessibilityLabel="Sort by completion or show time spent"
+              >
                 <View
                   style={[
                     styles.compactStatIcon,
@@ -1298,13 +1981,35 @@ const ActivityScreen = () => {
                 >
                   <Icon name="trending-up" size={scale(14)} color="#9C6CDA" />
                 </View>
-                <Text style={[styles.compactStatNumber, { color: "#9C6CDA" }]}>
-                  {stats.completionRate}%
+                <Text
+                  style={[
+                    styles.compactStatNumber,
+                    {
+                      color:
+                        sortBy === "completion" || analyticsMode === "time"
+                          ? "#9C6CDA"
+                          : "#B0B0B0",
+                    },
+                  ]}
+                >
+                  {analyticsMode === "completion"
+                    ? `${stats.completionRate}%`
+                    : stats.timeSpent}
                 </Text>
-                <Text style={[styles.compactStatLabel, { color: "#9C6CDA" }]}>
-                  Success
+                <Text
+                  style={[
+                    styles.compactStatLabel,
+                    {
+                      color:
+                        sortBy === "completion" || analyticsMode === "time"
+                          ? "#9C6CDA"
+                          : "#B0B0B0",
+                    },
+                  ]}
+                >
+                  {analyticsMode === "completion" ? "Success" : "Time"}
                 </Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </LinearGradient>
         </Animated.View>
@@ -1531,22 +2236,57 @@ const styles = StyleSheet.create({
     paddingBottom: scale(16),
   },
   titleContainer: {
-    alignItems: "center",
     marginBottom: scale(16),
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: scale(4),
+  },
+  titleButtonsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(8),
   },
   mainTitle: {
     fontSize: scale(32),
     fontWeight: "900",
     color: "#FFFFFF",
     letterSpacing: -1,
-    textAlign: "center",
-    marginBottom: scale(4),
+    flex: 1,
+  },
+  floatingSearchButton: {
+    borderRadius: scale(12),
+    overflow: "hidden",
+    elevation: 3,
+    shadowColor: "#00E5FF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  floatingSearchGradient: {
+    padding: scale(10),
+    borderRadius: scale(12),
+  },
+  floatingFilterButton: {
+    borderRadius: scale(12),
+    overflow: "hidden",
+    elevation: 3,
+    shadowColor: "#9C6CDA",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  floatingFilterGradient: {
+    padding: scale(10),
+    borderRadius: scale(12),
   },
   subtitle: {
     fontSize: scale(14),
     color: "#B0B0B0",
     fontWeight: "500",
-    textAlign: "center",
+    textAlign: "left",
   },
   headerActionsRow: {
     flexDirection: "row",
@@ -1583,7 +2323,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   compactAnalyticsCard: {
-    padding: scale(14),
+    padding: scale(10),
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
@@ -1596,22 +2336,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   compactStatIcon: {
-    width: scale(28),
-    height: scale(28),
-    borderRadius: scale(14),
+    width: scale(24),
+    height: scale(24),
+    borderRadius: scale(12),
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: scale(6),
+    marginBottom: scale(4),
   },
   compactStatNumber: {
-    fontSize: scale(18),
+    fontSize: scale(16),
     fontWeight: "800",
     color: "#FFFFFF",
     letterSpacing: -0.5,
-    marginBottom: scale(2),
+    marginBottom: scale(1),
   },
   compactStatLabel: {
-    fontSize: scale(10),
+    fontSize: scale(9),
     fontWeight: "600",
     color: "#B0B0B0",
     letterSpacing: 0.3,
@@ -1634,7 +2374,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    height: scale(130),
+    height: scale(130.19), // Increased by 7% from 117
   },
 
   // Enhanced Card Design
@@ -1645,7 +2385,7 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     flex: 1,
-    padding: scale(14),
+    padding: scale(12.6), // Reduced by 10% from 14
     justifyContent: "space-between",
   },
 
@@ -1654,17 +2394,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: scale(10),
+    marginBottom: scale(9), // Reduced by 10% from 10
   },
   titleSection: {
     flex: 1,
-    marginRight: scale(12),
+    marginRight: scale(10.8), // Reduced by 10% from 12
   },
   activityTitle: {
-    fontSize: scale(16),
+    fontSize: scale(14.4), // Reduced by 10% from 16
     fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: scale(2),
+    marginBottom: scale(1.8), // Reduced by 10% from 2
     letterSpacing: -0.3,
   },
   scheduledText: {
@@ -1705,7 +2445,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: scale(10),
+    marginBottom: scale(9), // Reduced by 10% from 10
   },
   leftContent: {
     flex: 2,
@@ -1720,16 +2460,16 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   timerValue: {
-    fontSize: scale(20),
+    fontSize: scale(18), // Reduced by 10% from 20
     fontWeight: "800",
     color: "#FFFFFF",
     letterSpacing: -0.5,
   },
   timerLabel: {
-    fontSize: scale(10),
+    fontSize: scale(9), // Reduced by 10% from 10
     fontWeight: "500",
     color: "#B0B0B0",
-    marginTop: scale(1),
+    marginTop: scale(0.9), // Reduced by 10% from 1
   },
 
   // Completed Section
@@ -1742,20 +2482,20 @@ const styles = StyleSheet.create({
     marginBottom: scale(2),
   },
   congratsText: {
-    fontSize: scale(14),
+    fontSize: scale(12.6), // Reduced by 10% from 14
     fontWeight: "700",
     color: "#4ECDC4",
-    marginLeft: scale(6),
+    marginLeft: scale(5.4), // Reduced by 10% from 6
   },
   // Streak Components
   streakContainer: {
-    marginTop: scale(4),
+    marginTop: scale(3.6), // Reduced by 10% from 4
   },
   streakLabel: {
-    fontSize: scale(9),
+    fontSize: scale(8.1), // Reduced by 10% from 9
     fontWeight: "600",
     color: "#B0B0B0",
-    marginBottom: scale(2),
+    marginBottom: scale(1.8), // Reduced by 10% from 2
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -1804,14 +2544,14 @@ const styles = StyleSheet.create({
 
   // Running Streak Components
   runningStreakContainer: {
-    marginTop: scale(6),
+    marginTop: scale(5.4), // Reduced by 10% from 6
     alignItems: "flex-end",
   },
   runningStreakLabel: {
-    fontSize: scale(7),
+    fontSize: scale(6.3), // Reduced by 10% from 7
     fontWeight: "600",
     color: "#00E5FF",
-    marginBottom: scale(1),
+    marginBottom: scale(0.9), // Reduced by 10% from 1
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -1839,10 +2579,10 @@ const styles = StyleSheet.create({
 
   // Duration Text
   durationText: {
-    fontSize: scale(12),
+    fontSize: scale(10.8), // Reduced by 10% from 12
     fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: scale(4),
+    marginBottom: scale(3.6), // Reduced by 10% from 4
   },
   dateText: {
     fontSize: scale(9),
@@ -1889,10 +2629,10 @@ const styles = StyleSheet.create({
     borderRadius: scale(3),
   },
   progressPercentage: {
-    fontSize: scale(10),
+    fontSize: scale(9), // Reduced by 10% from 10
     fontWeight: "700",
     color: "#FFFFFF",
-    minWidth: scale(30),
+    minWidth: scale(27), // Reduced by 10% from 30
     textAlign: "right",
   },
 
@@ -1901,9 +2641,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   controlButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: scale(32.4), // Reduced by 10% from 36
+    height: scale(32.4), // Reduced by 10% from 36
+    borderRadius: scale(16.2), // Reduced by 10% from 18
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
@@ -1917,18 +2657,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   completedButton: {
-    width: scale(36),
-    height: scale(36),
+    width: scale(32.4), // Reduced by 10% from 36
+    height: scale(32.4), // Reduced by 10% from 36
     justifyContent: "center",
     alignItems: "center",
   },
   futureButton: {
-    width: scale(36),
-    height: scale(36),
+    width: scale(32.4), // Reduced by 10% from 36
+    height: scale(32.4), // Reduced by 10% from 36
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: scale(18),
+    borderRadius: scale(16.2), // Reduced by 10% from 18
   },
 
   // Delete Mode
@@ -2140,6 +2880,239 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     marginLeft: scale(8),
     letterSpacing: 0.2,
+  },
+
+  // Filter Dropdown Styles
+  filterDropdownContainer: {
+    marginHorizontal: scale(20),
+    marginBottom: scale(16),
+    borderRadius: scale(16),
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  filterDropdownGradient: {
+    padding: scale(20),
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  filterDropdownSection: {
+    marginBottom: scale(16),
+  },
+  filterDropdownHalfSection: {
+    flex: 1,
+    marginBottom: scale(16),
+  },
+  filterDropdownRow: {
+    flexDirection: "row",
+    gap: scale(16),
+  },
+  filterDropdownTitle: {
+    fontSize: scale(14),
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: scale(8),
+  },
+  filterDropdownChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: scale(6),
+  },
+  filterDropdownChip: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: scale(16),
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(6),
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  filterDropdownChipActive: {
+    backgroundColor: "rgba(156, 108, 218, 0.2)",
+    borderColor: "#9C6CDA",
+  },
+  filterDropdownChipText: {
+    fontSize: scale(11),
+    fontWeight: "500",
+    color: "#B0B0B0",
+  },
+  filterDropdownChipTextActive: {
+    color: "#9C6CDA",
+    fontWeight: "600",
+  },
+  filterDropdownClearButton: {
+    borderRadius: scale(12),
+    overflow: "hidden",
+    marginTop: scale(8),
+  },
+  filterDropdownClearGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(20),
+  },
+  filterDropdownClearText: {
+    fontSize: scale(14),
+    fontWeight: "600",
+    color: "#FF4757",
+    marginLeft: scale(8),
+  },
+
+  // Inline Search Styles
+  searchExpandedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  searchExpandedInputContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: scale(12),
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(12),
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    marginRight: scale(12),
+  },
+  searchExpandedInput: {
+    flex: 1,
+    fontSize: scale(16),
+    color: "#FFFFFF",
+    marginLeft: scale(12),
+  },
+  searchExpandedClearButton: {
+    padding: scale(4),
+  },
+  searchExpandedCloseButton: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+
+  // Date Range Display
+  dateRangeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: scale(3.6), // Reduced by 10% from 4
+  },
+  dateRangeText: {
+    fontSize: scale(9), // Reduced by 10% from 10
+    fontWeight: "500",
+    color: "#B0B0B0",
+    marginRight: scale(3.6), // Reduced by 10% from 4
+  },
+
+  // Past Section
+  pastSection: {
+    marginTop: scale(4),
+  },
+  pastLabel: {
+    fontSize: scale(10),
+    fontWeight: "600",
+    color: "#FF4757",
+    marginBottom: scale(2),
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  pastDate: {
+    fontSize: scale(8),
+    fontWeight: "500",
+    color: "#B0B0B0",
+    marginBottom: scale(2),
+  },
+  pastStreakContainer: {
+    marginTop: scale(4),
+  },
+  pastStreakLabel: {
+    fontSize: scale(8),
+    fontWeight: "600",
+    color: "#FFD700",
+    marginBottom: scale(2),
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  pastStreakStarsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(1),
+  },
+
+  // Current Date Section
+  currentDateSection: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  currentDateText: {
+    fontSize: scale(8), // Reduced for inline display
+    fontWeight: "500",
+    color: "#B0B0B0",
+    marginLeft: scale(2),
+  },
+
+  // Past Button
+  pastButton: {
+    width: scale(32.4), // Reduced by 10% from 36
+    height: scale(32.4), // Reduced by 10% from 36
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: scale(16.2), // Reduced by 10% from 18
+  },
+
+  // Footer Right Section
+  footerRightSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(8),
+  },
+
+  // Inline Streak Container
+  inlineStreakContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(2),
+  },
+
+  // Inline Streak Text
+  inlineStreakText: {
+    fontSize: scale(8),
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+
+  // Card Title Row (for activity cards)
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
+  // Separator
+  separator: {
+    fontSize: scale(14.4),
+    fontWeight: "400",
+    color: "#B0B0B0",
+    marginHorizontal: scale(4),
+  },
+
+  // Priority Text
+  priorityText: {
+    fontSize: scale(10),
+    fontWeight: "500",
+    letterSpacing: 0.3,
+    fontStyle: "italic",
+    textTransform: "uppercase",
   },
 });
 
