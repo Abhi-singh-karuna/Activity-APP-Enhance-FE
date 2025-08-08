@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
 import { Activity } from "../../types";
+import { ThemeColors } from "../../config/theme";
 
 const { width, height } = Dimensions.get("window");
 const scale = (size: number) => (width / 375) * size;
@@ -39,23 +40,7 @@ interface NotesScreenProps {
   activity: Activity;
 }
 
-const ThemeColors = {
-  primary: "#00E5FF",
-  secondary: "#9C6CDA",
-  tertiary: "#FF9500",
-  danger: "#FF3B30",
-  background: "#000000",
-  surface: "#121212",
-  card: "#1E1E1E",
-  cardLight: "#2A2A2A",
-  text: "#FFFFFF",
-  textSecondary: "#B0B0B0",
-  textTertiary: "#808080",
-  border: "rgba(255, 255, 255, 0.1)",
-  accent: "#5856D6",
-  warning: "#FF9500",
-  success: "#4ECDC4",
-};
+// Using centralized ThemeColors
 
 const NoteColors = [
   "#00E5FF",
@@ -68,6 +53,20 @@ const NoteColors = [
   "#00C7BE",
   "#FFD60A",
 ];
+
+type FolderMeta = { id: string; name: string; color: string };
+
+const FOLDER_REGISTRY: Record<string, string> = {
+  All: ThemeColors.textSecondary,
+  Fitness: "#4ECDC4",
+  Health: "#FF9500",
+  Development: "#9C6CDA",
+  Work: "#00E5FF",
+  Personal: "#FF2D92",
+  General: ThemeColors.primary,
+};
+
+const slugify = (name: string) => name.toLowerCase().replace(/\s+/g, "-");
 
 // Enhanced mock data with better content
 const mockNotes: Note[] = [
@@ -93,7 +92,7 @@ const mockNotes: Note[] = [
     author: "John Doe",
     isRichText: false,
     tags: ["nutrition", "meal-prep", "health"],
-    color: ThemeColors.tertiary,
+    color: ThemeColors.warning,
     folder: "Health",
   },
   {
@@ -208,12 +207,38 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
-  const folders = [
-    "All",
-    ...Array.from(
-      new Set(notes.map((note) => note.folder || "General").filter(Boolean))
-    ),
-  ];
+  const folders: FolderMeta[] = useMemo(() => {
+    const base: FolderMeta[] = [
+      { id: "all", name: "All", color: FOLDER_REGISTRY["All"] },
+    ];
+    const dynamic = Array.from(
+      new Set(notes.map((n) => n.folder || "General").filter(Boolean))
+    ).map((name) => ({
+      id: slugify(name),
+      name,
+      color: FOLDER_REGISTRY[name] || ThemeColors.textSecondary,
+    }));
+    // Ensure "General" exists in the list if used
+    const names = new Set(dynamic.map((f) => f.name));
+    if (!names.has("General")) {
+      dynamic.push({
+        id: "general",
+        name: "General",
+        color: FOLDER_REGISTRY["General"],
+      });
+    }
+    return [...base, ...dynamic];
+  }, [notes]);
+
+  const folderCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    notes.forEach((n) => {
+      const name = n.folder || "General";
+      counts[name] = (counts[name] || 0) + 1;
+    });
+    counts["All"] = notes.length;
+    return counts;
+  }, [notes]);
 
   // Modal animations
   const showModal = () => {
@@ -273,11 +298,7 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
           <View style={styles.noteHeader}>
             <View style={styles.noteHeaderLeft}>
               {item.pinned && (
-                <Icon
-                  name="pin"
-                  size={scale(12)}
-                  color={ThemeColors.tertiary}
-                />
+                <Icon name="pin" size={scale(12)} color={ThemeColors.warning} />
               )}
               {item.title && (
                 <Text style={styles.noteTitle} numberOfLines={1}>
@@ -301,28 +322,7 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
             </Text>
           </View>
 
-          {item.tags && item.tags.length > 0 && (
-            <View style={styles.noteTags}>
-              {item.tags.slice(0, 2).map((tag, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.noteTag,
-                    { backgroundColor: item.color + "30" },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.noteTagText,
-                      { color: item.color || ThemeColors.primary },
-                    ]}
-                  >
-                    #{tag}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {/* Tags removed per request for cleaner cards */}
 
           <View style={styles.noteFooter}>
             <View style={styles.noteFolder}>
@@ -345,7 +345,7 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
                   size={scale(14)}
                   color={
                     item.pinned
-                      ? ThemeColors.tertiary
+                      ? ThemeColors.warning
                       : ThemeColors.textSecondary
                   }
                 />
@@ -565,24 +565,33 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
                 <Text style={styles.sectionTitle}>Folder</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {folders
-                    .filter((f) => f !== "All")
-                    .map((folder, index) => (
+                    .filter((f) => f.name !== "All")
+                    .map((folder) => (
                       <TouchableOpacity
-                        key={index}
+                        key={folder.id}
                         style={[
                           styles.folderOption,
-                          newNote.folder === folder && styles.selectedFolder,
+                          newNote.folder === folder.name &&
+                            styles.selectedFolder,
                         ]}
-                        onPress={() => setNewNote({ ...newNote, folder })}
+                        onPress={() =>
+                          setNewNote({ ...newNote, folder: folder.name })
+                        }
                       >
+                        <View
+                          style={[
+                            styles.folderColorDot,
+                            { backgroundColor: folder.color },
+                          ]}
+                        />
                         <Text
                           style={[
                             styles.folderOptionText,
-                            newNote.folder === folder &&
+                            newNote.folder === folder.name &&
                               styles.selectedFolderText,
                           ]}
                         >
-                          {folder}
+                          {folder.name}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -595,37 +604,8 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
     </Modal>
   );
 
-  return (
-    <View style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={ThemeColors.background}
-      />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notes</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon name="search" size={scale(20)} color={ThemeColors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon
-              name="folder-open"
-              size={scale(20)}
-              color={ThemeColors.text}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon
-              name="ellipsis-horizontal"
-              size={scale(20)}
-              color={ThemeColors.text}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
+  const renderListHeader = () => (
+    <View style={styles.listHeader}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -650,26 +630,59 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
         showsHorizontalScrollIndicator={false}
         style={styles.folderFilter}
       >
-        {folders.map((folder, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.folderChip,
-              selectedFolder === folder && styles.selectedFolderChip,
-            ]}
-            onPress={() => setSelectedFolder(folder)}
-          >
-            <Text
-              style={[
-                styles.folderChipText,
-                selectedFolder === folder && styles.selectedFolderChipText,
-              ]}
+        {folders.map((folder) => {
+          const isActive = selectedFolder === folder.name;
+          const ring = folder.color;
+          const textColor = isActive ? folder.color : ThemeColors.textSecondary;
+          const count = folderCounts[folder.name] ?? 0;
+          return (
+            <TouchableOpacity
+              key={folder.id}
+              style={styles.folderChip}
+              onPress={() => setSelectedFolder(folder.name)}
+              activeOpacity={0.85}
             >
-              {folder}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <LinearGradient
+                colors={[`${folder.color}26`, `${folder.color}14`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[
+                  styles.folderInner,
+                  {
+                    borderColor: isActive ? ring : ThemeColors.border,
+                    borderWidth: 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.folderChipText, { color: textColor }]}>
+                  {folder.name}
+                </Text>
+                <View
+                  style={[
+                    styles.countPill,
+                    { backgroundColor: `${folder.color}26` },
+                  ]}
+                >
+                  <Text style={[styles.countPillText, { color: folder.color }]}>
+                    {count}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={ThemeColors.background}
+      />
+
+      {/* Header removed per request */}
 
       {/* Notes List */}
       <FlatList
@@ -677,9 +690,12 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
         renderItem={renderNoteCard}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}
+        ListHeaderComponent={renderListHeader}
         contentContainerStyle={styles.listContainer}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
       />
 
       {/* Enhanced Floating Action Button */}
@@ -715,22 +731,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: ThemeColors.background,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 10,
-  },
-  headerTitle: {
-    fontSize: scale(28),
-    fontWeight: "700",
-    color: ThemeColors.text,
-  },
-  headerActions: {
+  // Header styles retained for reference but not used
+  // Ensure header controls always visible against background
+  // Add subtle backdrop behind the header action row
+  headerButtonsBackdrop: {
     flexDirection: "row",
     gap: 8,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    padding: 4,
+    borderRadius: 12,
   },
   headerButton: {
     width: 36,
@@ -739,10 +748,13 @@ const styles = StyleSheet.create({
     backgroundColor: ThemeColors.surface,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   searchContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingTop: 24,
+    paddingBottom: 10,
   },
   searchBar: {
     flexDirection: "row",
@@ -763,14 +775,39 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   folderChip: {
-    backgroundColor: ThemeColors.surface,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     marginRight: 8,
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   selectedFolderChip: {
     backgroundColor: ThemeColors.primary,
+    borderWidth: 1,
+    borderColor: ThemeColors.primary,
+  },
+  folderInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  folderColorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  countPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  countPillText: {
+    fontSize: scale(12),
+    fontWeight: "700",
   },
   folderChipText: {
     color: ThemeColors.textSecondary,
@@ -783,6 +820,12 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 20,
     paddingBottom: 100,
+  },
+  listHeader: {
+    backgroundColor: ThemeColors.background,
+  },
+  columnWrapper: {
+    justifyContent: "space-between",
   },
   separator: {
     height: 12,
@@ -1007,9 +1050,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+    minHeight: 36,
   },
   selectedFolder: {
     backgroundColor: ThemeColors.primary,
+    borderWidth: 1,
+    borderColor: ThemeColors.primary,
   },
   folderOptionText: {
     color: ThemeColors.textSecondary,

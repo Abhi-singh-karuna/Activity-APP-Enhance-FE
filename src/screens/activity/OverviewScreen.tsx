@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
-import { Activity, Category } from "../../types";
+import { Activity } from "../../types";
+import { ThemeColors } from "../../config/theme";
 
 const { width } = Dimensions.get("window");
 const scale = (size: number) => (width / 375) * size;
@@ -29,25 +30,14 @@ interface OverviewScreenProps {
     description?: string;
     tags?: string[];
     notes?: string;
+    totalTimeSpent?: number;
+    lastCompletedDate?: string;
   };
   onTimerToggle: () => void;
   renderStreakStars: (streak: number, size?: number) => React.ReactNode;
 }
 
-const ThemeColors = {
-  primary: "#00E5FF",
-  secondary: "#9C6CDA",
-  success: "#4ECDC4",
-  warning: "#FF9500",
-  danger: "#FF4757",
-  background: "#000000",
-  surface: "#121212",
-  card: "#1E1E1E",
-  text: "#FFFFFF",
-  textSecondary: "#B0B0B0",
-  textTertiary: "#808080",
-  border: "rgba(255, 255, 255, 0.1)",
-};
+// Using centralized ThemeColors
 
 const OverviewScreen: React.FC<OverviewScreenProps> = ({
   activity,
@@ -100,17 +90,19 @@ const OverviewScreen: React.FC<OverviewScreenProps> = ({
     onTimerToggle();
   }, [onTimerToggle]);
 
+  const baseColor = activity.color || ThemeColors.primary;
+  const completion = activity.completionPercentage ?? 0;
   const getStatusGradient = (): [string, string] => {
     if (activity.isCompleted) {
-      return ["#4ECDC4", "#44A08D"];
-    }
-    if (activity.isRunning) {
-      return ["#00E5FF", "#9C6CDA"];
+      return ["#2D5A27", "#1A3318"];
     }
     if (activity.isPaused) {
       return ["#666666", "#444444"];
     }
-    return ["#FF9500", "#FF6B35"];
+    if (activity.isRunning) {
+      return [`${baseColor}40`, `${baseColor}20`];
+    }
+    return [`${baseColor}15`, `${baseColor}08`];
   };
 
   const getStatusText = () => {
@@ -153,6 +145,16 @@ const OverviewScreen: React.FC<OverviewScreenProps> = ({
     }
   };
 
+  const formatTimeHHMMSS = (seconds: number): string => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(
+      2,
+      "0"
+    )}:${String(s).padStart(2, "0")}`;
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -161,6 +163,7 @@ const OverviewScreen: React.FC<OverviewScreenProps> = ({
     >
       {/* Activity Status Card */}
       <View style={styles.statusCard}>
+        <View style={[styles.cardAccent, { backgroundColor: baseColor }]} />
         <LinearGradient
           colors={getStatusGradient()}
           style={styles.statusCardGradient}
@@ -195,20 +198,49 @@ const OverviewScreen: React.FC<OverviewScreenProps> = ({
               </View>
             </View>
           </View>
+
+          {completion > 0 && (
+            <View style={styles.progressRow}>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${completion}%`,
+                      backgroundColor: baseColor,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressLabel}>{completion}%</Text>
+            </View>
+          )}
         </LinearGradient>
       </View>
 
       {/* Timer Card */}
       <View style={styles.timerCard}>
+        <View style={[styles.cardAccent, { backgroundColor: baseColor }]} />
         <View style={styles.timerHeader}>
           <Icon name="time" size={scale(16)} color={ThemeColors.primary} />
           <Text style={styles.timerTitle}>Timer</Text>
         </View>
 
         <View style={styles.timerContent}>
-          <Text style={styles.timerValue}>
-            {activity.currentTimer || activity.duration}
-          </Text>
+          <LinearGradient
+            colors={
+              activity.isRunning
+                ? [`${baseColor}40`, `${baseColor}20`]
+                : [`${baseColor}15`, `${baseColor}08`]
+            }
+            style={styles.timerValueGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Text style={styles.timerValue}>
+              {activity.currentTimer || activity.duration}
+            </Text>
+          </LinearGradient>
 
           <TouchableOpacity
             style={styles.timerControls}
@@ -224,8 +256,8 @@ const OverviewScreen: React.FC<OverviewScreenProps> = ({
               <LinearGradient
                 colors={
                   activity.isRunning
-                    ? ["#FF4757", "#FF3742"]
-                    : ["#4ECDC4", "#44A08D"]
+                    ? [ThemeColors.danger, "#FF6B9D"]
+                    : [baseColor, ThemeColors.secondary]
                 }
                 style={styles.timerButtonGradient}
                 start={{ x: 0, y: 0 }}
@@ -247,6 +279,7 @@ const OverviewScreen: React.FC<OverviewScreenProps> = ({
 
       {/* Activity Details Card */}
       <View style={styles.detailsCard}>
+        <View style={[styles.cardAccent, { backgroundColor: baseColor }]} />
         <Text style={styles.sectionTitle}>Activity Details</Text>
 
         <View style={styles.detailRow}>
@@ -286,37 +319,47 @@ const OverviewScreen: React.FC<OverviewScreenProps> = ({
             <Text style={styles.detailValue}>{activity.color}</Text>
           </View>
         </View>
+
+        {typeof activity.elapsedSeconds === "number" && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Elapsed Time</Text>
+            <Text style={styles.detailValue}>
+              {formatTimeHHMMSS(activity.elapsedSeconds)}
+            </Text>
+          </View>
+        )}
+
+        {typeof activity.totalTimeSpent === "number" && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Total Time Spent</Text>
+            <Text style={styles.detailValue}>
+              {formatTimeHHMMSS(activity.totalTimeSpent)}
+            </Text>
+          </View>
+        )}
+
+        {activity.lastCompletedDate && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Last Completed</Text>
+            <Text style={styles.detailValue}>{activity.lastCompletedDate}</Text>
+          </View>
+        )}
       </View>
 
       {/* Description Card */}
       {activity.description && (
         <View style={styles.descriptionCard}>
+          <View style={[styles.cardAccent, { backgroundColor: baseColor }]} />
           <Text style={styles.sectionTitle}>Description</Text>
           <Text style={styles.descriptionText}>{activity.description}</Text>
         </View>
       )}
 
-      {/* Tags Card */}
-      {activity.tags && activity.tags.length > 0 && (
-        <View style={styles.tagsCard}>
-          <View style={styles.tagsHeader}>
-            <Text style={styles.sectionTitle}>Tags</Text>
-            <TouchableOpacity style={styles.addTagButton}>
-              <Icon name="add" size={scale(16)} color={ThemeColors.primary} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.tagsContainer}>
-            {activity.tags.map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>#{tag}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
+      {/* Tags section removed as requested */}
 
       {/* Notes Preview Card */}
       <View style={styles.notesCard}>
+        <View style={[styles.cardAccent, { backgroundColor: baseColor }]} />
         <View style={styles.notesHeader}>
           <Text style={styles.sectionTitle}>Notes</Text>
           <TouchableOpacity style={styles.addNoteButton}>
@@ -355,6 +398,7 @@ const styles = StyleSheet.create({
     backgroundColor: ThemeColors.background,
   },
   contentContainer: {
+    paddingTop: scale(12),
     paddingBottom: 20,
   },
   statusCard: {
@@ -362,14 +406,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 16,
     overflow: "hidden",
-    elevation: 8,
+    elevation: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
   statusCardGradient: {
     padding: 20,
+  },
+  cardAccent: {
+    height: 4,
+    backgroundColor: ThemeColors.primary,
   },
   statusHeader: {
     flexDirection: "row",
@@ -448,6 +498,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   timerHeader: {
     flexDirection: "row",
@@ -462,6 +514,14 @@ const styles = StyleSheet.create({
   },
   timerContent: {
     alignItems: "center",
+  },
+  timerValueGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    marginBottom: 16,
   },
   timerValue: {
     color: ThemeColors.text,
@@ -500,6 +560,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   sectionTitle: {
     color: ThemeColors.text,
@@ -556,6 +618,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   descriptionText: {
     color: ThemeColors.text,
@@ -615,6 +679,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   notesHeader: {
     flexDirection: "row",
@@ -660,6 +726,30 @@ const styles = StyleSheet.create({
     color: ThemeColors.primary,
     fontSize: scale(14),
     fontWeight: "600",
+  },
+
+  // Progress styles
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  progressLabel: {
+    color: "#fff",
+    fontSize: scale(12),
+    fontWeight: "700",
   },
 });
 

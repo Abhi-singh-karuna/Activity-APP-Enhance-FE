@@ -16,9 +16,11 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
+import { ThemeColors } from "../../config/theme";
 import { RootStackParamList } from "../../navigation";
 import { Activity, Category } from "../../types";
-import EditActivityModal from "../../components/EditActivityModal";
+// Use AddActivityModal for both create and edit
+import AddActivityModal from "../../components/AddActivityModal";
 import OverviewScreen from "./OverviewScreen";
 import HistoryScreen from "./HistoryScreen";
 import StreakScreen from "./StreakScreen";
@@ -67,21 +69,10 @@ interface EnhancedActivityData {
   updatedAt: string;
 }
 
-// Theme colors
-const ThemeColors = {
-  primary: "#00E5FF",
-  secondary: "#9C6CDA",
-  success: "#4ECDC4",
-  warning: "#FF9500",
-  danger: "#FF4757",
-  background: "#000000",
-  surface: "#121212",
-  card: "#1E1E1E",
-  cardSecondary: "#2A2A2A",
-  text: "#FFFFFF",
-  textSecondary: "#B0B0B0",
-  textTertiary: "#808080",
-  border: "rgba(255, 255, 255, 0.1)",
+// Using centralized ThemeColors
+const GradientConfigs = {
+  header: ["#000000", "#121212"] as [string, string],
+  primary: ["#00E5FF", "#9C6CDA"] as [string, string],
 };
 
 const ActivityDetailScreen = () => {
@@ -189,6 +180,8 @@ const ActivityDetailScreen = () => {
     setActivityData((prev) => ({
       ...prev,
       ...updatedActivity,
+      // Ensure category remains typed correctly if changed
+      category: (updatedActivity.category as Category) || prev.category,
       updatedAt: new Date().toISOString(),
     }));
     setShowEditModal(false);
@@ -228,47 +221,80 @@ const ActivityDetailScreen = () => {
       {/* Header */}
       <Animated.View
         style={[
-          styles.header,
+          styles.headerContainer,
           {
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }],
           },
         ]}
       >
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.headerButton}
+        <LinearGradient
+          colors={GradientConfigs.header}
+          style={styles.headerGradient}
         >
-          <Icon name="chevron-back" size={scale(24)} color={ThemeColors.text} />
-        </TouchableOpacity>
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.8}
+            >
+              <View style={styles.headerIconWrapper}>
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.12)", "rgba(255,255,255,0.06)"]}
+                  style={styles.headerIconGradient}
+                >
+                  <Icon
+                    name="chevron-back"
+                    size={scale(18)}
+                    color={ThemeColors.text}
+                  />
+                </LinearGradient>
+              </View>
+            </TouchableOpacity>
 
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Activity Details</Text>
-          <Text style={styles.headerSubtitle}>{activityData.title}</Text>
-        </View>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>Activity Details</Text>
+              <View style={styles.headerSubtitleRow}>
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {activityData.title}
+                </Text>
+                <View style={styles.headerCategoryBadge}>
+                  <Text style={styles.headerCategoryText}>
+                    {String(activityData.category).toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+            </View>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={showEditModalWithAnimation}
-            style={styles.headerButton}
-          >
-            <Icon
-              name="create-outline"
-              size={scale(20)}
-              color={ThemeColors.primary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowDeleteModal(true)}
-            style={styles.headerButton}
-          >
-            <Icon
-              name="trash-outline"
-              size={scale(20)}
-              color={ThemeColors.danger}
-            />
-          </TouchableOpacity>
-        </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                onPress={showEditModalWithAnimation}
+                activeOpacity={0.85}
+              >
+                <View style={styles.headerIconWrapper}>
+                  <LinearGradient
+                    colors={GradientConfigs.primary}
+                    style={styles.headerIconGradient}
+                  >
+                    <Icon name="create-outline" size={scale(16)} color="#000" />
+                  </LinearGradient>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowDeleteModal(true)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.headerIconWrapper}>
+                  <LinearGradient
+                    colors={["#FF4757", "#FF6B9D"]}
+                    style={styles.headerIconGradient}
+                  >
+                    <Icon name="trash-outline" size={scale(16)} color="#fff" />
+                  </LinearGradient>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
       </Animated.View>
 
       {/* Tab Navigation */}
@@ -403,12 +429,13 @@ const ActivityDetailScreen = () => {
 
       {activeTab === "notes" && <NotesScreen activity={activityData} />}
 
-      {/* Edit Activity Modal */}
-      <EditActivityModal
+      {/* Edit Activity Modal - reuse AddActivityModal in edit mode */}
+      <AddActivityModal
         visible={showEditModal}
         onClose={() => setShowEditModal(false)}
-        onSave={handleEditActivity}
-        activity={activityData}
+        onUpdate={handleEditActivity}
+        mode="edit"
+        initialActivity={activityData}
       />
 
       {/* Delete Confirmation Modal */}
@@ -465,37 +492,72 @@ const styles = StyleSheet.create({
   },
 
   // Enhanced Header styles
-  header: {
+  headerContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: ThemeColors.border,
+  },
+  headerGradient: {
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 14 : 10,
+    paddingBottom: 12,
+  },
+  headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    paddingBottom: 15,
-    backgroundColor: "transparent",
-    borderBottomWidth: 1,
-    borderBottomColor: ThemeColors.border,
+    gap: 8,
   },
   headerButton: {
     padding: 5,
   },
   headerTitleContainer: {
     flex: 1,
-    marginLeft: 10,
+    marginHorizontal: 10,
   },
   headerTitle: {
     color: ThemeColors.text,
-    fontSize: scale(18),
-    fontWeight: "600",
+    fontSize: scale(20),
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  headerSubtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   headerSubtitle: {
     color: ThemeColors.textSecondary,
     fontSize: scale(14),
-    fontWeight: "500",
+    fontWeight: "600",
+  },
+  headerCategoryBadge: {
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  headerCategoryText: {
+    color: ThemeColors.text,
+    fontSize: scale(10),
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   headerActions: {
     flexDirection: "row",
     gap: 10,
+  },
+  headerIconWrapper: {
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  headerIconGradient: {
+    width: scale(34),
+    height: scale(34),
+    borderRadius: scale(17),
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Tab Navigation styles

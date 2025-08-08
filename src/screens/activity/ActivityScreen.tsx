@@ -170,6 +170,9 @@ const ActivityScreen = () => {
   const [analyticsMode, setAnalyticsMode] = useState<"completion" | "time">(
     "completion"
   );
+  // Simple FAB: no menu
+  const listRef = useRef<FlatList<EnhancedActivity> | null>(null);
+  const fabPressAnim = useRef(new Animated.Value(1)).current;
 
   // Enhanced animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -979,6 +982,8 @@ const ActivityScreen = () => {
     [getActiveFiltersCount]
   );
 
+  // No quick menu; single add action is handled inline
+
   // Helper function to render streak stars
   const renderStreakStars = useCallback(
     (streak: number, isFuture: boolean = false, isRunning: boolean = false) => {
@@ -1119,19 +1124,7 @@ const ActivityScreen = () => {
                         <Text style={styles.activityTitle} numberOfLines={1}>
                           {item.title}
                         </Text>
-                        {item.priorityName && (
-                          <>
-                            <Text style={styles.separator}> | </Text>
-                            <Text
-                              style={[
-                                styles.priorityText,
-                                { color: item.priorityColor },
-                              ]}
-                            >
-                              {item.priorityName}
-                            </Text>
-                          </>
-                        )}
+                        {/* Removed inline priority name in favor of dedicated priority badge */}
                       </View>
 
                       {/* Date Range Display */}
@@ -1150,21 +1143,110 @@ const ActivityScreen = () => {
                     </View>
 
                     <View style={styles.headerRight}>
-                      <View
-                        style={[
-                          styles.categoryBadge,
-                          isCompleted && styles.completedCategoryBadge,
-                        ]}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          // toggle category filter
+                          LayoutAnimation.configureNext(
+                            LayoutAnimation.Presets.easeInEaseOut
+                          );
+                          setFilterCategory((prev) =>
+                            prev === (item.category as Category)
+                              ? null
+                              : (item.category as Category)
+                          );
+                          setFilterStatus("all");
+                        }}
+                        onLongPress={(e) => {
+                          e.stopPropagation();
+                          // long-press to clear category filter
+                          LayoutAnimation.configureNext(
+                            LayoutAnimation.Presets.easeInEaseOut
+                          );
+                          setFilterCategory(null);
+                        }}
                       >
-                        <Text
+                        <View
                           style={[
-                            styles.categoryText,
-                            isCompleted && styles.completedCategoryText,
+                            styles.categoryBadge,
+                            isCompleted && styles.completedCategoryBadge,
+                            filterCategory === item.category &&
+                              styles.categoryBadgeActive,
                           ]}
                         >
-                          {item.category.toUpperCase()}
-                        </Text>
-                      </View>
+                          <Text
+                            style={[
+                              styles.categoryText,
+                              isCompleted && styles.completedCategoryText,
+                              filterCategory === item.category &&
+                                styles.categoryTextActive,
+                            ]}
+                          >
+                            {item.category.toUpperCase()}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      {/* Priority Badge */}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          if (typeof item.priority === "number") {
+                            LayoutAnimation.configureNext(
+                              LayoutAnimation.Presets.easeInEaseOut
+                            );
+                            setFilterPriority((prev) =>
+                              prev === item.priority ? null : item.priority
+                            );
+                            setFilterStatus("all");
+                          }
+                        }}
+                        onLongPress={(e) => {
+                          e.stopPropagation();
+                          LayoutAnimation.configureNext(
+                            LayoutAnimation.Presets.easeInEaseOut
+                          );
+                          setFilterPriority(null);
+                        }}
+                        accessibilityLabel="Filter by this priority"
+                      >
+                        {(() => {
+                          const badgeColor =
+                            item.priorityColor ||
+                            (item.priority === 1
+                              ? "#FF4757"
+                              : item.priority === 2
+                              ? "#FF9500"
+                              : "#4ECDC4");
+                          const isActive = filterPriority === item.priority;
+                          return (
+                            <View
+                              style={[
+                                styles.priorityBadge,
+                                isActive && styles.priorityBadgeActive,
+                                {
+                                  borderColor: badgeColor,
+                                  backgroundColor: `${badgeColor}26`, // ~15% opacity
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.priorityBadgeText,
+                                  isActive && styles.priorityBadgeTextActive,
+                                  { color: badgeColor },
+                                ]}
+                              >
+                                {(
+                                  item.priorityName || `P${item.priority}`
+                                )?.toUpperCase()}
+                              </Text>
+                            </View>
+                          );
+                        })()}
+                      </TouchableOpacity>
 
                       {/* Control Button */}
                       <View style={styles.controlSection}>
@@ -1491,7 +1573,21 @@ const ActivityScreen = () => {
             {!showSearchModal ? (
               <>
                 <View style={styles.titleRow}>
-                  <Text style={styles.mainTitle}>Activity Hub</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      listRef.current?.scrollToOffset({
+                        offset: 0,
+                        animated: true,
+                      });
+                      if (Platform.OS === "ios" || Platform.OS === "android") {
+                        Vibration.vibrate(10);
+                      }
+                    }}
+                    accessibilityLabel="Scroll to top"
+                  >
+                    <Text style={styles.mainTitle}>Activity Hub</Text>
+                  </TouchableOpacity>
                   <View style={styles.titleButtonsContainer}>
                     <TouchableOpacity
                       style={styles.floatingSearchButton}
@@ -2019,6 +2115,9 @@ const ActivityScreen = () => {
           data={filteredAndSortedActivities}
           renderItem={renderActivityItem}
           keyExtractor={(item) => item.id}
+          ref={(ref) => {
+            listRef.current = ref;
+          }}
           contentContainerStyle={[
             styles.activityList,
             { paddingTop: scale(8), paddingBottom: scale(100) },
@@ -2065,6 +2164,7 @@ const ActivityScreen = () => {
 
         {/* Floating Action Button */}
         <Animated.View
+          pointerEvents="box-none"
           style={[
             styles.fabContainer,
             {
@@ -2077,6 +2177,22 @@ const ActivityScreen = () => {
             style={styles.fab}
             activeOpacity={0.85}
             onPress={() => setModalVisible(true)}
+            onPressIn={() => {
+              Animated.timing(fabPressAnim, {
+                toValue: 0.96,
+                duration: 100,
+                useNativeDriver: true,
+              }).start();
+            }}
+            onPressOut={() => {
+              Animated.spring(fabPressAnim, {
+                toValue: 1,
+                tension: 120,
+                friction: 8,
+                useNativeDriver: true,
+              }).start();
+            }}
+            hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
           >
             {/* Glow Effect */}
             <Animated.View
@@ -2096,33 +2212,37 @@ const ActivityScreen = () => {
               />
             </Animated.View>
 
-            <LinearGradient
-              colors={["#00E5FF", "#9C6CDA", "#4ECDC4"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.fabGradient}
-            >
-              <Animated.View
-                style={{
-                  transform: [
-                    {
-                      scale: pulseAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 1.05],
-                      }),
-                    },
-                  ],
-                }}
+            <Animated.View style={{ transform: [{ scale: fabPressAnim }] }}>
+              <LinearGradient
+                colors={["#00E5FF", "#9C6CDA", "#4ECDC4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.fabGradient}
               >
-                <Icon
-                  name="add"
-                  size={scale(28)}
-                  color="#FFFFFF"
-                  style={styles.fabIcon}
-                />
-              </Animated.View>
-            </LinearGradient>
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        scale: pulseAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 1.05],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Icon
+                    name="add"
+                    size={scale(28)}
+                    color="#FFFFFF"
+                    style={styles.fabIcon}
+                  />
+                </Animated.View>
+              </LinearGradient>
+            </Animated.View>
           </TouchableOpacity>
+
+          {/* FAB quick menu removed for iOS reliability */}
         </Animated.View>
 
         {/* Add Activity Modal */}
@@ -2432,6 +2552,39 @@ const styles = StyleSheet.create({
   completedCategoryText: {
     color: "#4ECDC4",
   },
+  categoryBadgeActive: {
+    backgroundColor: "rgba(156, 108, 218, 0.2)",
+    borderColor: "#9C6CDA",
+  },
+  categoryTextActive: {
+    color: "#9C6CDA",
+  },
+
+  // Priority Badge Styles (matching category badge design language)
+  priorityBadge: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(4),
+    borderRadius: scale(6),
+    minWidth: scale(70),
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    marginLeft: scale(6),
+  },
+  priorityBadgeActive: {
+    backgroundColor: "rgba(156, 108, 218, 0.2)",
+    borderColor: "#9C6CDA",
+  },
+  priorityBadgeText: {
+    fontSize: scale(9),
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  priorityBadgeTextActive: {
+    color: "#FFFFFF",
+  },
 
   // Header Right Section
   headerRight: {
@@ -2713,6 +2866,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: scale(30),
     right: scale(20),
+    zIndex: 2000,
   },
   fab: {
     width: scale(56),
@@ -2724,6 +2878,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
+    zIndex: 2001,
   },
   fabGlow: {
     position: "absolute",
@@ -2741,12 +2896,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#151515",
   },
   fabIcon: {
     textShadowColor: "#00E5FF",
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 12,
+    // iOS rendering fix for crisp icon edges
+    backgroundColor: "transparent",
   },
+
+  // (Removed) FAB Quick Menu styles retained no longer needed
 
   // Modal Styles
   modalOverlay: {

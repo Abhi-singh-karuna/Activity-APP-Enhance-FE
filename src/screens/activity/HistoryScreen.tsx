@@ -11,6 +11,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
 import { Activity } from "../../types";
+import { ThemeColors } from "../../config/theme";
 
 const { width } = Dimensions.get("window");
 const scale = (size: number) => (width / 375) * size;
@@ -34,21 +35,7 @@ interface HistoryScreenProps {
   sessions: SessionHistory[];
 }
 
-const ThemeColors = {
-  primary: "#00E5FF",
-  secondary: "#9C6CDA",
-  success: "#4ECDC4",
-  warning: "#FF9500",
-  danger: "#FF4757",
-  background: "#000000",
-  surface: "#121212",
-  card: "#1E1E1E",
-  cardLight: "#2A2A2A",
-  text: "#FFFFFF",
-  textSecondary: "#B0B0B0",
-  textTertiary: "#808080",
-  border: "rgba(255, 255, 255, 0.1)",
-};
+// Using centralized ThemeColors
 
 // Enhanced mock data with more realistic information
 const mockSessions: SessionHistory[] = [
@@ -196,6 +183,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({
   activity,
   sessions = mockSessions,
 }) => {
+  const baseColor = activity.color || ThemeColors.primary;
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
   const getStatusColor = (status: SessionHistory["status"]) => {
@@ -268,6 +256,10 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({
   const renderSessionItem = useCallback(
     ({ item }: { item: SessionHistory }) => {
       const isSelected = selectedSession === item.id;
+      const getSessionGradient = (selected: boolean): [string, string] =>
+        selected
+          ? ([`${baseColor}40`, `${baseColor}20`] as [string, string])
+          : ([`${baseColor}15`, `${baseColor}08`] as [string, string]);
 
       return (
         <TouchableOpacity
@@ -276,12 +268,10 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={
-              isSelected
-                ? ["rgba(0, 229, 255, 0.1)", "rgba(156, 108, 218, 0.1)"]
-                : ["transparent", "transparent"]
-            }
+            colors={getSessionGradient(isSelected)}
             style={styles.sessionItemGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
             <View style={styles.sessionHeader}>
               <View style={styles.sessionDate}>
@@ -330,18 +320,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({
                   <Text style={styles.sessionInfoText}>{item.progress}%</Text>
                 </View>
 
-                {item.calories && (
-                  <View style={styles.sessionInfoItem}>
-                    <Icon
-                      name="flame"
-                      size={scale(12)}
-                      color={ThemeColors.textSecondary}
-                    />
-                    <Text style={styles.sessionInfoText}>
-                      {item.calories} cal
-                    </Text>
-                  </View>
-                )}
+                {/* Removed calories display as requested */}
               </View>
 
               {item.intensity && (
@@ -414,83 +393,128 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({
       sessions.reduce((acc, session) => acc + session.progress, 0) /
         sessions.length
     );
-    const totalCalories = sessions.reduce(
-      (acc, session) => acc + (session.calories || 0),
-      0
-    );
+    // Removed calories aggregation as not needed
 
     return (
       <View style={styles.statsCard}>
-        <Text style={styles.statsTitle}>Session Statistics</Text>
+        <LinearGradient
+          colors={[`${baseColor}15`, `${baseColor}08`]}
+          style={styles.cardInnerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Text style={styles.statsTitle}>Session Statistics</Text>
 
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{totalSessions}</Text>
-            <Text style={styles.statLabel}>Total Sessions</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: baseColor }]}>
+                {totalSessions}
+              </Text>
+              <Text style={styles.statLabel}>Total Sessions</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: baseColor }]}>
+                {completedSessions}
+              </Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: baseColor }]}>
+                {totalMinutes}m
+              </Text>
+              <Text style={styles.statLabel}>Total Time</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: baseColor }]}>
+                {avgProgress}%
+              </Text>
+              <Text style={styles.statLabel}>Avg Progress</Text>
+            </View>
           </View>
 
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{completedSessions}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </View>
-
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{totalMinutes}m</Text>
-            <Text style={styles.statLabel}>Total Time</Text>
-          </View>
-
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{avgProgress}%</Text>
-            <Text style={styles.statLabel}>Avg Progress</Text>
-          </View>
-        </View>
-
-        <View style={styles.caloriesContainer}>
-          <Icon name="flame" size={scale(16)} color={ThemeColors.warning} />
-          <Text style={styles.caloriesText}>
-            {totalCalories} calories burned
-          </Text>
-        </View>
+          {/* Calories footer removed */}
+        </LinearGradient>
       </View>
     );
   };
 
   const renderProgressChart = () => (
     <View style={styles.chartCard}>
-      <Text style={styles.chartTitle}>Progress Over Time</Text>
+      <LinearGradient
+        colors={[`${baseColor}15`, `${baseColor}08`]}
+        style={styles.cardInnerGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <Text style={styles.chartTitle}>Progress Over Time</Text>
 
-      <View style={styles.chartContainer}>
-        <View style={styles.chartYAxis}>
-          <Text style={styles.chartYLabel}>100%</Text>
-          <Text style={styles.chartYLabel}>75%</Text>
-          <Text style={styles.chartYLabel}>50%</Text>
-          <Text style={styles.chartYLabel}>25%</Text>
-          <Text style={styles.chartYLabel}>0%</Text>
-        </View>
+        <View style={styles.chartContainer}>
+          <View style={styles.chartYAxis}>
+            <Text style={styles.chartYLabel}>100%</Text>
+            <Text style={styles.chartYLabel}>75%</Text>
+            <Text style={styles.chartYLabel}>50%</Text>
+            <Text style={styles.chartYLabel}>25%</Text>
+            <Text style={styles.chartYLabel}>0%</Text>
+          </View>
 
-        <View style={styles.chartContent}>
-          <View style={styles.chartBars}>
-            {sessions.slice(0, 7).map((session, index) => (
-              <View key={session.id} style={styles.chartBarContainer}>
-                <View style={styles.chartBar}>
-                  <View
-                    style={[
-                      styles.chartBarFill,
-                      {
-                        height: `${session.progress}%`,
-                        backgroundColor: getStatusColor(session.status),
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.chartBarLabel}>
-                  {new Date(session.date).getDate()}
-                </Text>
-              </View>
-            ))}
+          <View style={styles.chartContent}>
+            <View style={styles.chartBars}>
+              {sessions
+                .concat(
+                  // add a few dummy data points for demo purpose
+                  [
+                    {
+                      id: "d1",
+                      date: "2025-01-16",
+                      duration: "00:30:00",
+                      startTime: "07:00",
+                      endTime: "07:30",
+                      status: "completed" as const,
+                      notes: "Light session",
+                      progress: 80,
+                      intensity: "medium" as const,
+                      mood: "good" as const,
+                    },
+                    {
+                      id: "d2",
+                      date: "2025-01-17",
+                      duration: "00:20:00",
+                      startTime: "18:00",
+                      endTime: "18:20",
+                      status: "paused" as const,
+                      notes: "Busy day",
+                      progress: 40,
+                      intensity: "low" as const,
+                      mood: "okay" as const,
+                    },
+                  ]
+                )
+                .slice(0, 7)
+                .map((session, index) => (
+                  <View key={session.id} style={styles.chartBarContainer}>
+                    <View style={styles.chartBar}>
+                      <View
+                        style={[
+                          styles.chartBarFill,
+                          {
+                            height: `${session.progress}%`,
+                            backgroundColor: getStatusColor(session.status),
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.chartBarLabel}>
+                      {new Date(session.date).getDate()}
+                    </Text>
+                  </View>
+                ))}
+            </View>
           </View>
         </View>
-      </View>
+      </LinearGradient>
     </View>
   );
 
@@ -501,7 +525,10 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({
         renderItem={renderSessionItem}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+          styles.listContainer,
+          { paddingTop: scale(12) },
+        ]}
         ListHeaderComponent={
           <View>
             {renderStatsCard()}
@@ -534,6 +561,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+  },
+  cardInnerGradient: {
+    borderRadius: 14,
+    padding: 16,
   },
   statsTitle: {
     color: ThemeColors.text,
@@ -587,6 +620,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   chartTitle: {
     color: ThemeColors.text,
@@ -658,6 +693,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
   },
   sessionItemSelected: {
     elevation: 8,

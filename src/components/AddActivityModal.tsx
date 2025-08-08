@@ -24,7 +24,10 @@ import { useAppContext } from "../context/AppContext";
 interface AddActivityModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (activity: Partial<Activity>) => void;
+  onAdd?: (activity: Partial<Activity>) => void;
+  onUpdate?: (activity: Partial<Activity>) => void;
+  mode?: "create" | "edit";
+  initialActivity?: Partial<Activity>;
 }
 
 // Get device dimensions
@@ -115,6 +118,9 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
   visible,
   onClose,
   onAdd,
+  onUpdate,
+  mode = "create",
+  initialActivity,
 }) => {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -170,6 +176,13 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
   // Animation when modal opens/closes
   React.useEffect(() => {
     if (visible) {
+      // Initialize form for edit mode with provided initial activity
+      if (mode === "edit" && initialActivity) {
+        setNewActivity((prev) => ({
+          ...prev,
+          ...initialActivity,
+        }));
+      }
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -288,20 +301,24 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
     return Object.keys(newErrors).length === 0;
   }, [newActivity]);
 
-  const handleAddActivity = useCallback(async () => {
+  const handleSubmit = useCallback(async () => {
     if (!validateForm()) return;
 
     try {
       setIsLoading(true);
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      onAdd(newActivity);
+      if (mode === "edit" && onUpdate) {
+        onUpdate(newActivity);
+      } else if (onAdd) {
+        onAdd(newActivity);
+      }
       onClose();
     } catch (error) {
-      console.error("Failed to add activity:", error);
+      console.error("Failed to submit activity:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [newActivity, onAdd, onClose, validateForm]);
+  }, [mode, newActivity, onAdd, onUpdate, onClose, validateForm]);
 
   // Date picker functions
   const confirmStartDate = useCallback(() => {
@@ -776,12 +793,14 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
               <View style={styles.compactHeaderLeft}>
                 <View style={styles.compactHeaderIcon}>
                   <Icon
-                    name="add-circle"
+                    name={mode === "edit" ? "create" : "add-circle"}
                     size={scale(20)}
                     color={ThemeColors.primary}
                   />
                 </View>
-                <Text style={styles.compactModalTitle}>Add Activity</Text>
+                <Text style={styles.compactModalTitle}>
+                  {mode === "edit" ? "Edit Activity" : "Add Activity"}
+                </Text>
               </View>
 
               <TouchableOpacity
@@ -1077,7 +1096,7 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
               >
                 <TouchableOpacity
                   style={styles.compactAddButtonTouchable}
-                  onPress={handleAddActivity}
+                  onPress={handleSubmit}
                   disabled={isLoading}
                   activeOpacity={0.9}
                 >
@@ -1098,9 +1117,15 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
                       <>
-                        <Icon name="rocket" size={scale(18)} color="#fff" />
+                        <Icon
+                          name={mode === "edit" ? "save" : "rocket"}
+                          size={scale(18)}
+                          color="#fff"
+                        />
                         <Text style={styles.compactAddButtonText}>
-                          Create Activity
+                          {mode === "edit"
+                            ? "Update Activity"
+                            : "Create Activity"}
                         </Text>
                         <View style={styles.addButtonGlow} />
                       </>
