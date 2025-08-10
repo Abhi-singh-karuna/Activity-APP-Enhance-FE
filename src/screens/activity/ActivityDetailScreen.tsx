@@ -12,6 +12,18 @@ import {
   Animated,
   Platform,
 } from "react-native";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  addMonths,
+  eachDayOfInterval,
+  isSameDay,
+  isBefore,
+  isAfter,
+  isWithinInterval,
+  parseISO,
+} from "date-fns";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Icon from "react-native-vector-icons/Ionicons";
@@ -90,6 +102,7 @@ const ActivityDetailScreen = () => {
   >("overview");
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRangeModal, setShowRangeModal] = useState(false);
 
   // Enhanced activity data with mock values
   const [activityData, setActivityData] = useState<EnhancedActivityData>({
@@ -117,6 +130,28 @@ const ActivityDetailScreen = () => {
     createdAt: "2025-08-01T08:00:00Z",
     updatedAt: "2025-08-02T08:00:00Z",
   });
+
+  const [dateRange] = useState<{ start: Date; end: Date }>(() => ({
+    start: parseISO(activityData.startDate),
+    end: parseISO(activityData.endDate),
+  }));
+
+  const clampToRange = (d: Date) => {
+    const { start, end } = dateRange;
+    if (isBefore(d, start)) return start;
+    if (isAfter(d, end)) return end;
+    return d;
+  };
+
+  const [selectedDate, setSelectedDate] = useState<Date>(() =>
+    clampToRange(new Date())
+  );
+  const [tempSelectedDate, setTempSelectedDate] = useState<Date | null>(
+    selectedDate
+  );
+  const [calMonth, setCalMonth] = useState<Date>(() =>
+    startOfMonth(selectedDate)
+  );
 
   // Animation on mount
   useEffect(() => {
@@ -211,6 +246,27 @@ const ActivityDetailScreen = () => {
     setShowEditModal(true);
   };
 
+  const daysInCalMonth = eachDayOfInterval({
+    start: startOfMonth(calMonth),
+    end: endOfMonth(calMonth),
+  });
+
+  const isWithinAllowedRange = (d: Date) => {
+    return !isBefore(d, dateRange.start) && !isAfter(d, dateRange.end);
+  };
+
+  const applySelectedDate = () => {
+    if (!tempSelectedDate) return;
+    setSelectedDate(tempSelectedDate);
+    setShowRangeModal(false);
+  };
+
+  const resetTempSelected = () => {
+    setTempSelectedDate(clampToRange(new Date()));
+  };
+
+  const dateLabel = () => format(selectedDate, "MMM d, yyyy");
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar
@@ -262,6 +318,33 @@ const ActivityDetailScreen = () => {
                     {String(activityData.category).toUpperCase()}
                   </Text>
                 </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setTempSelectedDate(selectedDate);
+                    setCalMonth(startOfMonth(selectedDate));
+                    setShowRangeModal(true);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={[
+                      "rgba(0, 229, 255, 0.18)",
+                      "rgba(156, 108, 218, 0.12)",
+                    ]}
+                    style={styles.headerDateRangeChip}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Icon
+                      name="calendar-outline"
+                      size={scale(12)}
+                      color={ThemeColors.text}
+                    />
+                    <Text style={styles.headerDateRangeText} numberOfLines={1}>
+                      {dateLabel()}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -480,6 +563,153 @@ const ActivityDetailScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Date Range Modal */}
+      <Modal
+        visible={showRangeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRangeModal(false)}
+      >
+        <View style={styles.rangeModalOverlay}>
+          <View style={styles.rangeModalContainer}>
+            <LinearGradient
+              colors={[ThemeColors.card, ThemeColors.cardSecondary]}
+              style={styles.rangeModalGradient}
+            >
+              <View style={styles.rangeModalHeader}>
+                <TouchableOpacity
+                  onPress={() => setCalMonth((m) => addMonths(m, -1))}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={[
+                      "rgba(255,255,255,0.12)",
+                      "rgba(255,255,255,0.06)",
+                    ]}
+                    style={styles.navIconButton}
+                  >
+                    <Icon
+                      name="chevron-back"
+                      size={scale(14)}
+                      color={ThemeColors.text}
+                    />
+                  </LinearGradient>
+                </TouchableOpacity>
+                <Text style={styles.rangeMonthTitle}>
+                  {format(calMonth, "MMMM yyyy")}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setCalMonth((m) => addMonths(m, 1))}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={[
+                      "rgba(255,255,255,0.12)",
+                      "rgba(255,255,255,0.06)",
+                    ]}
+                    style={styles.navIconButton}
+                  >
+                    <Icon
+                      name="chevron-forward"
+                      size={scale(14)}
+                      color={ThemeColors.text}
+                    />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.weekdayHeaderRow}>
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                  <Text key={d} style={styles.weekdayCell}>
+                    {d}
+                  </Text>
+                ))}
+              </View>
+
+              <View style={styles.calendarGrid}>
+                {Array.from({ length: daysInCalMonth[0].getDay() }).map(
+                  (_, idx) => (
+                    <View
+                      key={`empty-${idx}`}
+                      style={styles.calendarCellEmpty}
+                    />
+                  )
+                )}
+
+                {daysInCalMonth.map((date) => {
+                  const disabled = !isWithinAllowedRange(date);
+                  const isSel =
+                    !!tempSelectedDate && isSameDay(date, tempSelectedDate);
+                  return (
+                    <TouchableOpacity
+                      key={date.toISOString()}
+                      style={styles.calendarCell}
+                      onPress={() => !disabled && setTempSelectedDate(date)}
+                      disabled={disabled}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={
+                          isSel
+                            ? ([
+                                "rgba(0,229,255,0.8)",
+                                "rgba(156,108,218,0.6)",
+                              ] as [string, string])
+                            : (["transparent", "transparent"] as [
+                                string,
+                                string
+                              ])
+                        }
+                        style={[
+                          styles.calendarDayPill,
+                          isSel && styles.calendarDaySelected,
+                          disabled && { opacity: 0.35 },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarDayText,
+                            isSel && styles.calendarDayTextSelected,
+                          ]}
+                        >
+                          {date.getDate()}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.rangeActionsRow}>
+                <TouchableOpacity
+                  style={styles.rangeActionGhost}
+                  onPress={resetTempSelected}
+                >
+                  <Text style={styles.rangeActionGhostText}>Today</Text>
+                </TouchableOpacity>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                  style={styles.rangeActionCancel}
+                  onPress={() => setShowRangeModal(false)}
+                >
+                  <Text style={styles.rangeActionCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.rangeActionApply,
+                    !tempSelectedDate && { opacity: 0.6 },
+                  ]}
+                  onPress={applySelectedDate}
+                  disabled={!tempSelectedDate}
+                >
+                  <Text style={styles.rangeActionApplyText}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -524,6 +754,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  headerDateRangeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+  },
+  headerDateRangeText: {
+    color: ThemeColors.text,
+    fontSize: scale(10),
+    fontWeight: "700",
+    maxWidth: 140,
   },
   headerSubtitle: {
     color: ThemeColors.textSecondary,
@@ -669,6 +915,140 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: scale(14),
     fontWeight: "600",
+  },
+
+  // Range modal styles
+  rangeModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  rangeModalContainer: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  rangeModalGradient: {
+    padding: 16,
+  },
+  rangeModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  rangeMonthTitle: {
+    color: ThemeColors.text,
+    fontSize: scale(14),
+    fontWeight: "700",
+  },
+  navIconButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+  },
+  weekdayHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    paddingHorizontal: 6,
+  },
+  weekdayCell: {
+    width: 36,
+    textAlign: "center",
+    color: ThemeColors.textSecondary,
+    fontSize: scale(10),
+    fontWeight: "600",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    paddingHorizontal: 4,
+  },
+  calendarCellEmpty: {
+    width: 36,
+    height: 36,
+    margin: 6,
+  },
+  calendarCell: {
+    width: 36,
+    height: 36,
+    margin: 6,
+  },
+  calendarDayPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  calendarDaySelected: {
+    borderColor: "rgba(0,229,255,0.5)",
+  },
+  calendarDayInRange: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  calendarDayText: {
+    color: ThemeColors.textSecondary,
+    fontSize: scale(12),
+    fontWeight: "700",
+  },
+  calendarDayTextSelected: {
+    color: "#fff",
+  },
+  rangeActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    gap: 8,
+  },
+  rangeActionGhost: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  rangeActionGhostText: {
+    color: ThemeColors.textSecondary,
+    fontWeight: "700",
+    fontSize: scale(12),
+  },
+  rangeActionCancel: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+  },
+  rangeActionCancelText: {
+    color: ThemeColors.text,
+    fontWeight: "700",
+    fontSize: scale(12),
+  },
+  rangeActionApply: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: ThemeColors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(0,229,255,0.5)",
+  },
+  rangeActionApplyText: {
+    color: "#000",
+    fontWeight: "800",
+    fontSize: scale(12),
+    letterSpacing: 0.2,
   },
 });
 

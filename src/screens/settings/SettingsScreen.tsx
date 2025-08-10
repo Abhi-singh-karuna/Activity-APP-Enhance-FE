@@ -155,7 +155,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
       <View style={customAlertStyles.overlay}>
         <View style={customAlertStyles.container}>
           <LinearGradient
-            colors={["rgba(30, 30, 30, 0.98)", "rgba(42, 42, 42, 0.98)"]}
+            colors={["#1E1E1E", "#2C2C2E"]}
             style={customAlertStyles.gradient}
           >
             <View style={customAlertStyles.header}>
@@ -209,7 +209,7 @@ interface SettingItem {
   name: string;
   icon: string;
   color: string;
-  category: "categories" | "skipReasons" | "priorities";
+  category: "categories" | "skipReasons" | "priorities" | "folders";
   priority?: number;
   level?: number;
 }
@@ -245,22 +245,26 @@ const SettingsScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [categories, setCategories] = useState<SettingItem[]>([]);
+  const [folders, setFolders] = useState<SettingItem[]>([]);
   const [skipReasons, setSkipReasons] = useState<SettingItem[]>([]);
   const [priorities, setPriorities] = useState<SettingItem[]>([]);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
   // Section visibility states
   const [categoriesVisible, setCategoriesVisible] = useState(true);
+  const [foldersVisible, setFoldersVisible] = useState(true);
   const [skipReasonsVisible, setSkipReasonsVisible] = useState(true);
   const [prioritiesVisible, setPrioritiesVisible] = useState(true);
 
   // Section-specific loading states
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [foldersLoading, setFoldersLoading] = useState(false);
   const [skipReasonsLoading, setSkipReasonsLoading] = useState(false);
   const [prioritiesLoading, setPrioritiesLoading] = useState(false);
 
   // Animation refs for section refreshes
   const categoriesOpacity = useRef(new Animated.Value(1)).current;
+  const foldersOpacity = useRef(new Animated.Value(1)).current;
   const skipReasonsOpacity = useRef(new Animated.Value(1)).current;
   const prioritiesOpacity = useRef(new Animated.Value(1)).current;
 
@@ -273,7 +277,7 @@ const SettingsScreen = () => {
   const [selectedIcon, setSelectedIcon] = useState(ICON_OPTIONS[0].name);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<
-    "categories" | "skipReasons" | "priorities"
+    "categories" | "folders" | "skipReasons" | "priorities"
   >("categories");
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState("");
@@ -282,6 +286,23 @@ const SettingsScreen = () => {
     null
   );
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+
+  // Shimmer animation for skeleton placeholders during initial load
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const startShimmer = useCallback(() => {
+    shimmerAnim.setValue(0);
+    Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [shimmerAnim]);
+
+  useEffect(() => {
+    if (isLoading) startShimmer();
+  }, [isLoading, startShimmer]);
 
   // Section toggle functions with improved animations
   const toggleCategoriesVisibility = useCallback(() => {
@@ -298,6 +319,11 @@ const SettingsScreen = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setPrioritiesVisible(!prioritiesVisible);
   }, [prioritiesVisible]);
+
+  const toggleFoldersVisibility = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setFoldersVisible(!foldersVisible);
+  }, [foldersVisible]);
 
   // Load user info
   const loadUserInfo = useCallback(async () => {
@@ -317,11 +343,13 @@ const SettingsScreen = () => {
       setIsLoading(true);
 
       // Load all settings data from API
-      const [categoriesRes, skipReasonsRes, prioritiesRes] = await Promise.all([
-        settingsService.getCategories(),
-        settingsService.getSkipReasons(),
-        settingsService.getPriorities(),
-      ]);
+      const [categoriesRes, foldersRes, skipReasonsRes, prioritiesRes] =
+        await Promise.all([
+          settingsService.getCategories(),
+          settingsService.getFolders(),
+          settingsService.getSkipReasons(),
+          settingsService.getPriorities(),
+        ]);
 
       // Update state with API responses
       if (categoriesRes.status && categoriesRes.data) {
@@ -335,6 +363,11 @@ const SettingsScreen = () => {
           "✅ Skip reasons loaded:",
           skipReasonsRes.data.length
         );
+      }
+
+      if (foldersRes.status && foldersRes.data) {
+        setFolders(foldersRes.data);
+        console.tron?.log("✅ Folders loaded:", foldersRes.data.length);
       }
 
       if (prioritiesRes.status && prioritiesRes.data) {
@@ -387,6 +420,32 @@ const SettingsScreen = () => {
       setCategoriesLoading(false);
     }
   }, [categoriesOpacity]);
+
+  const refreshFolders = useCallback(async () => {
+    setFoldersLoading(true);
+
+    Animated.timing(foldersOpacity, {
+      toValue: 0.3,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    try {
+      const response = await settingsService.getFolders();
+      if (response.status && response.data) {
+        setFolders(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to refresh folders:", error);
+    } finally {
+      Animated.timing(foldersOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setFoldersLoading(false);
+    }
+  }, [foldersOpacity]);
 
   const refreshSkipReasons = useCallback(async () => {
     setSkipReasonsLoading(true);
@@ -496,6 +555,12 @@ const SettingsScreen = () => {
         case "categories":
           response = await settingsService.createCategory(createData);
           break;
+        case "folders":
+          response = await settingsService.createFolder({
+            name: newItem.name,
+            color: newItem.color,
+          });
+          break;
         case "skipReasons":
           response = await settingsService.createSkipReason(createData);
           break;
@@ -509,6 +574,9 @@ const SettingsScreen = () => {
         switch (currentCategory) {
           case "categories":
             await refreshCategories();
+            break;
+          case "folders":
+            await refreshFolders();
             break;
           case "skipReasons":
             await refreshSkipReasons();
@@ -579,6 +647,13 @@ const SettingsScreen = () => {
         case "categories":
           response = await settingsService.updateCategory(updateData);
           break;
+        case "folders":
+          response = await settingsService.updateFolder({
+            id: editingItem.id,
+            name: updatedItem.name,
+            color: updatedItem.color,
+          });
+          break;
         case "skipReasons":
           response = await settingsService.updateSkipReason(updateData);
           break;
@@ -592,6 +667,9 @@ const SettingsScreen = () => {
         switch (currentCategory) {
           case "categories":
             await refreshCategories();
+            break;
+          case "folders":
+            await refreshFolders();
             break;
           case "skipReasons":
             await refreshSkipReasons();
@@ -653,6 +731,9 @@ const SettingsScreen = () => {
                   case "categories":
                     response = await settingsService.deleteCategory(item.id);
                     break;
+                  case "folders":
+                    response = await settingsService.deleteFolder(item.id);
+                    break;
                   case "skipReasons":
                     response = await settingsService.deleteSkipReason(item.id);
                     break;
@@ -666,6 +747,9 @@ const SettingsScreen = () => {
                   switch (item.category) {
                     case "categories":
                       await refreshCategories();
+                      break;
+                    case "folders":
+                      await refreshFolders();
                       break;
                     case "skipReasons":
                       await refreshSkipReasons();
@@ -718,7 +802,7 @@ const SettingsScreen = () => {
   // Modal management
   const showModal = useCallback(
     (
-      category: "categories" | "skipReasons" | "priorities",
+      category: "categories" | "folders" | "skipReasons" | "priorities",
       item?: SettingItem
     ) => {
       setCurrentCategory(category);
@@ -726,12 +810,16 @@ const SettingsScreen = () => {
         setEditingItem(item);
         setNewItemName(item.name);
         setSelectedColor(item.color);
-        setSelectedIcon(item.icon);
+        if (category !== "folders") {
+          setSelectedIcon(item.icon);
+        }
       } else {
         setEditingItem(null);
         setNewItemName("");
         setSelectedColor(ColorOptions[0].value);
-        setSelectedIcon(ICON_OPTIONS[0].name);
+        if (category !== "folders") {
+          setSelectedIcon(ICON_OPTIONS[0].name);
+        }
       }
       setShowAddModal(true);
     },
@@ -1037,14 +1125,34 @@ const SettingsScreen = () => {
     [selectedIcon]
   );
 
-  if (isLoading) {
+  // Inline Skeleton item component (defined after hooks to avoid hoisting issues)
+  const SkeletonItem = useCallback(() => {
+    const translateX = shimmerAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-120, 320],
+    });
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={ThemeColors.primary} />
-        <Text style={styles.loadingText}>Loading settings...</Text>
+      <View style={styles.skeletonCard}>
+        <View style={styles.skeletonLeft}>
+          <View style={styles.skeletonIcon} />
+          <View style={styles.skeletonTextBlock}>
+            <View style={styles.skeletonLineLong} />
+            <View style={styles.skeletonLineShort} />
+          </View>
+        </View>
+        <View style={styles.skeletonActions}>
+          <View style={styles.skeletonActionBtn} />
+          <View style={styles.skeletonActionBtn} />
+        </View>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.skeletonShimmer, { transform: [{ translateX }] }]}
+        />
       </View>
     );
-  }
+  }, [shimmerAnim]);
+
+  // Do not return a blocking loader; show header and skeleton sections instead
 
   return (
     <View style={styles.container}>
@@ -1093,7 +1201,7 @@ const SettingsScreen = () => {
         <Animated.View style={[styles.section, { opacity: categoriesOpacity }]}>
           <View style={styles.sectionCard}>
             <LinearGradient
-              colors={["rgba(28, 28, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
+              colors={["#1E1E1E", "#2C2C2E"]}
               style={styles.sectionGradient}
             >
               <TouchableOpacity
@@ -1150,7 +1258,15 @@ const SettingsScreen = () => {
 
               {categoriesVisible && (
                 <View style={styles.sectionContent}>
-                  {categories.length > 0 ? (
+                  {isLoading ? (
+                    <View style={styles.settingsList}>
+                      <View style={styles.skeletonCardWrapper}>
+                        <SkeletonItem />
+                        <SkeletonItem />
+                        <SkeletonItem />
+                      </View>
+                    </View>
+                  ) : categories.length > 0 ? (
                     <View style={styles.settingsList}>
                       {categories.map((item, index) =>
                         renderSettingItem(item, index)
@@ -1185,13 +1301,113 @@ const SettingsScreen = () => {
           </View>
         </Animated.View>
 
+        {/* Folders Section */}
+        <Animated.View style={[styles.section, { opacity: foldersOpacity }]}>
+          <View style={styles.sectionCard}>
+            <LinearGradient
+              colors={["#1E1E1E", "#2C2C2E"]}
+              style={styles.sectionGradient}
+            >
+              <TouchableOpacity
+                style={styles.sectionHeader}
+                onPress={toggleFoldersVisibility}
+                activeOpacity={0.8}
+              >
+                <View style={styles.sectionHeaderLeft}>
+                  <View
+                    style={[
+                      styles.sectionIcon,
+                      { backgroundColor: ThemeColors.primary },
+                    ]}
+                  >
+                    <Icon name="folder" size={scale(18)} color="#fff" />
+                  </View>
+                  <View style={styles.sectionHeaderText}>
+                    <Text style={styles.sectionTitle}>
+                      Folders ({folders.length})
+                      {foldersLoading && (
+                        <Text style={styles.loadingIndicator}> ⟳</Text>
+                      )}
+                    </Text>
+                    <Text style={styles.sectionSubtitle}>
+                      Organize activities into folders
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.sectionHeaderRight}>
+                  <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      showModal("folders");
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <LinearGradient
+                      colors={[ThemeColors.primary, ThemeColors.secondary]}
+                      style={styles.addButtonGradient}
+                    >
+                      <Icon name="add" size={scale(16)} color="#fff" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <View style={styles.toggleIcon}>
+                    <Icon
+                      name={foldersVisible ? "chevron-up" : "chevron-down"}
+                      size={scale(18)}
+                      color={ThemeColors.textSecondary}
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {foldersVisible && (
+                <View style={styles.sectionContent}>
+                  {isLoading ? (
+                    <View style={styles.settingsList}>
+                      <SkeletonItem />
+                      <SkeletonItem />
+                      <SkeletonItem />
+                    </View>
+                  ) : folders.length > 0 ? (
+                    <View style={styles.settingsList}>
+                      {folders.map((item, index) =>
+                        renderSettingItem(item, index)
+                      )}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <View style={styles.emptyStateIcon}>
+                        <Icon
+                          name="folder-outline"
+                          size={scale(32)}
+                          color={ThemeColors.textTertiary}
+                        />
+                      </View>
+                      <Text style={styles.emptyStateText}>No folders yet</Text>
+                      <TouchableOpacity
+                        style={styles.emptyStateButton}
+                        onPress={() => showModal("folders")}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.emptyStateButtonText}>
+                          Add First Folder
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+            </LinearGradient>
+          </View>
+        </Animated.View>
+
         {/* Skip Reasons Section */}
         <Animated.View
           style={[styles.section, { opacity: skipReasonsOpacity }]}
         >
           <View style={styles.sectionCard}>
             <LinearGradient
-              colors={["rgba(28, 28, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
+              colors={["#1E1E1E", "#2C2C2E"]}
               style={styles.sectionGradient}
             >
               <TouchableOpacity
@@ -1248,7 +1464,13 @@ const SettingsScreen = () => {
 
               {skipReasonsVisible && (
                 <View style={styles.sectionContent}>
-                  {skipReasons.length > 0 ? (
+                  {isLoading ? (
+                    <View style={styles.settingsList}>
+                      <SkeletonItem />
+                      <SkeletonItem />
+                      <SkeletonItem />
+                    </View>
+                  ) : skipReasons.length > 0 ? (
                     <View style={styles.settingsList}>
                       {skipReasons.map((item, index) =>
                         renderSettingItem(item, index)
@@ -1287,7 +1509,7 @@ const SettingsScreen = () => {
         <Animated.View style={[styles.section, { opacity: prioritiesOpacity }]}>
           <View style={styles.sectionCard}>
             <LinearGradient
-              colors={["rgba(28, 28, 30, 0.98)", "rgba(44, 44, 46, 0.95)"]}
+              colors={["#1E1E1E", "#2C2C2E"]}
               style={styles.sectionGradient}
             >
               <TouchableOpacity
@@ -1344,7 +1566,13 @@ const SettingsScreen = () => {
 
               {prioritiesVisible && (
                 <View style={styles.sectionContent}>
-                  {priorities.length > 0 ? (
+                  {isLoading ? (
+                    <View style={styles.settingsList}>
+                      <SkeletonItem />
+                      <SkeletonItem />
+                      <SkeletonItem />
+                    </View>
+                  ) : priorities.length > 0 ? (
                     <View style={styles.settingsList}>
                       {priorities.map((item, index) =>
                         renderSettingItem(item, index)
@@ -1581,13 +1809,15 @@ const SettingsScreen = () => {
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <View style={styles.modalContainer}>
                 <LinearGradient
-                  colors={["rgba(30, 30, 30, 0.95)", "rgba(42, 42, 42, 0.95)"]}
+                  colors={["#1E1E1E", "#2C2C2E"]}
                   style={styles.modalGradient}
                 >
                   <Text style={styles.modalTitle}>
                     {editingItem ? "Edit" : "Add"}{" "}
                     {currentCategory === "categories"
                       ? "Category"
+                      : currentCategory === "folders"
+                      ? "Folder"
                       : currentCategory === "skipReasons"
                       ? "Skip Reason"
                       : "Priority Level"}
@@ -1600,6 +1830,8 @@ const SettingsScreen = () => {
                       placeholder={`Enter ${
                         currentCategory === "categories"
                           ? "category"
+                          : currentCategory === "folders"
+                          ? "folder"
                           : currentCategory === "skipReasons"
                           ? "reason"
                           : "priority"
@@ -1636,31 +1868,35 @@ const SettingsScreen = () => {
 
                   {showColorPicker && renderColorPicker()}
 
-                  <View style={styles.modalInputContainer}>
-                    <Text style={styles.inputLabel}>Icon</Text>
-                    <TouchableOpacity
-                      style={styles.iconPickerButton}
-                      onPress={() => setShowIconPicker(!showIconPicker)}
-                    >
-                      <View style={styles.selectedIconPreview}>
-                        <Icon
-                          name={selectedIcon}
-                          size={scale(20)}
-                          color={ThemeColors.text}
-                        />
+                  {currentCategory !== "folders" && (
+                    <>
+                      <View style={styles.modalInputContainer}>
+                        <Text style={styles.inputLabel}>Icon</Text>
+                        <TouchableOpacity
+                          style={styles.iconPickerButton}
+                          onPress={() => setShowIconPicker(!showIconPicker)}
+                        >
+                          <View style={styles.selectedIconPreview}>
+                            <Icon
+                              name={selectedIcon}
+                              size={scale(20)}
+                              color={ThemeColors.text}
+                            />
+                          </View>
+                          <Text style={styles.iconPickerButtonText}>
+                            Select Icon
+                          </Text>
+                          <Icon
+                            name="chevron-down"
+                            size={scale(16)}
+                            color={ThemeColors.textSecondary}
+                          />
+                        </TouchableOpacity>
                       </View>
-                      <Text style={styles.iconPickerButtonText}>
-                        Select Icon
-                      </Text>
-                      <Icon
-                        name="chevron-down"
-                        size={scale(16)}
-                        color={ThemeColors.textSecondary}
-                      />
-                    </TouchableOpacity>
-                  </View>
 
-                  {showIconPicker && renderIconPicker()}
+                      {showIconPicker && renderIconPicker()}
+                    </>
+                  )}
 
                   <View style={styles.modalActions}>
                     <TouchableOpacity
@@ -1726,7 +1962,7 @@ const SettingsScreen = () => {
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <View style={styles.modalContainer}>
                 <LinearGradient
-                  colors={["rgba(30, 30, 30, 0.95)", "rgba(42, 42, 42, 0.95)"]}
+                  colors={["#1E1E1E", "#2C2C2E"]}
                   style={styles.modalGradient}
                 >
                   <Icon
@@ -1956,13 +2192,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: ThemeColors.text,
-    fontSize: scale(28),
+    fontSize: scale(24),
     fontWeight: "900",
     letterSpacing: 0.5,
   },
   headerSubtitle: {
     color: ThemeColors.textSecondary,
-    fontSize: scale(14),
+    fontSize: scale(12),
     marginTop: scale(2),
   },
   scrollView: {
@@ -1996,8 +2232,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: scale(18),
-    paddingVertical: scale(16),
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(12),
     borderBottomWidth: 0.5,
     borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
@@ -2012,12 +2248,12 @@ const styles = StyleSheet.create({
     gap: scale(12),
   },
   sectionIcon: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: scale(30),
+    height: scale(30),
+    borderRadius: scale(15),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: scale(12),
+    marginRight: scale(10),
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -2029,20 +2265,20 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: ThemeColors.text,
-    fontSize: scale(16),
+    fontSize: scale(14),
     fontWeight: "700",
     marginBottom: scale(2),
     letterSpacing: 0.3,
   },
   sectionSubtitle: {
     color: ThemeColors.textSecondary,
-    fontSize: scale(12),
+    fontSize: scale(10),
     fontWeight: "500",
   },
   addButton: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
     overflow: "hidden",
     elevation: 3,
     shadowColor: "#000",
@@ -2059,12 +2295,76 @@ const styles = StyleSheet.create({
     padding: scale(4),
   },
   sectionContent: {
-    paddingHorizontal: scale(18),
-    paddingTop: scale(14),
-    paddingBottom: scale(18),
+    paddingHorizontal: scale(16),
+    paddingTop: scale(12),
+    paddingBottom: scale(14),
   },
   settingsList: {
     gap: scale(10),
+  },
+  // Skeleton styles
+  skeletonCardWrapper: {
+    gap: scale(10),
+  },
+  skeletonCard: {
+    borderRadius: scale(12),
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(10),
+  },
+  skeletonLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  skeletonIcon: {
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
+    backgroundColor: "rgba(255,255,255,0.12)",
+    marginRight: scale(10),
+  },
+  skeletonTextBlock: {
+    flex: 1,
+  },
+  skeletonLineLong: {
+    height: scale(10),
+    borderRadius: scale(5),
+    backgroundColor: "rgba(255,255,255,0.12)",
+    marginBottom: scale(6),
+    width: "60%",
+  },
+  skeletonLineShort: {
+    height: scale(8),
+    borderRadius: scale(4),
+    backgroundColor: "rgba(255,255,255,0.1)",
+    width: "40%",
+  },
+  skeletonActions: {
+    position: "absolute",
+    right: scale(10),
+    top: scale(10),
+    flexDirection: "row",
+    gap: scale(8),
+  },
+  skeletonActionBtn: {
+    width: scale(26),
+    height: scale(26),
+    borderRadius: scale(13),
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  skeletonShimmer: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: scale(120),
+    backgroundColor: "rgba(255,255,255,0.06)",
+    opacity: 0.7,
   },
   settingItemCard: {
     borderRadius: scale(12),
@@ -2084,8 +2384,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: scale(14),
-    paddingVertical: scale(12),
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(10),
   },
   settingItemLeft: {
     flexDirection: "row",
@@ -2093,12 +2393,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingIcon: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: scale(12),
+    marginRight: scale(10),
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -2110,14 +2410,14 @@ const styles = StyleSheet.create({
   },
   settingItemName: {
     color: ThemeColors.text,
-    fontSize: scale(14),
+    fontSize: scale(12),
     fontWeight: "600",
     marginBottom: scale(2),
     letterSpacing: 0.2,
   },
   settingItemMeta: {
     color: ThemeColors.textSecondary,
-    fontSize: scale(11),
+    fontSize: scale(10),
     fontWeight: "500",
   },
   settingItemActions: {
@@ -2127,9 +2427,9 @@ const styles = StyleSheet.create({
   },
   // FIXED: Delete icon alignment issue
   actionButton: {
-    width: scale(30),
-    height: scale(30),
-    borderRadius: scale(15),
+    width: scale(26),
+    height: scale(26),
+    borderRadius: scale(13),
     justifyContent: "center",
     alignItems: "center", // This ensures perfect centering
     borderWidth: 1,
@@ -2154,7 +2454,7 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     color: ThemeColors.textTertiary,
-    fontSize: scale(14),
+    fontSize: scale(12),
     fontWeight: "500",
     marginBottom: scale(16),
     textAlign: "center",
@@ -2169,7 +2469,7 @@ const styles = StyleSheet.create({
   },
   emptyStateButtonText: {
     color: ThemeColors.primary,
-    fontSize: scale(13),
+    fontSize: scale(12),
     fontWeight: "600",
     letterSpacing: 0.2,
   },
@@ -2184,7 +2484,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   accountCardGradient: {
-    padding: scale(16),
+    padding: scale(14),
     borderWidth: 0.5,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
@@ -2194,11 +2494,11 @@ const styles = StyleSheet.create({
     marginBottom: scale(16),
   },
   accountAvatar: {
-    width: scale(50),
-    height: scale(50),
-    borderRadius: scale(25),
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(22),
     overflow: "hidden",
-    marginRight: scale(14),
+    marginRight: scale(12),
     elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -2220,19 +2520,19 @@ const styles = StyleSheet.create({
   },
   accountName: {
     color: ThemeColors.text,
-    fontSize: scale(16),
+    fontSize: scale(14),
     fontWeight: "700",
     marginBottom: scale(4),
     letterSpacing: 0.3,
   },
   accountEmail: {
     color: ThemeColors.textSecondary,
-    fontSize: scale(13),
+    fontSize: scale(12),
     marginBottom: scale(4),
   },
   accountStatus: {
     color: ThemeColors.success,
-    fontSize: scale(12),
+    fontSize: scale(11),
     fontWeight: "600",
   },
   improvedLogoutButton: {
@@ -2248,13 +2548,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(20),
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(16),
     gap: scale(8),
   },
   improvedLogoutButtonText: {
     color: "#fff",
-    fontSize: scale(15),
+    fontSize: scale(13),
     fontWeight: "700",
     letterSpacing: 0.3,
   },
@@ -2275,14 +2575,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(20),
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(16),
     gap: scale(8),
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
   dangerButtonText: {
-    fontSize: scale(15),
+    fontSize: scale(13),
     fontWeight: "600",
     letterSpacing: 0.2,
   },
@@ -2296,7 +2596,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "100%",
     maxWidth: scale(400),
-    borderRadius: scale(24),
+    borderRadius: scale(18),
     overflow: "hidden",
     elevation: 20,
     shadowColor: "#000",
@@ -2305,32 +2605,32 @@ const styles = StyleSheet.create({
     shadowRadius: 25,
   },
   modalGradient: {
-    padding: scale(24),
+    padding: scale(18),
     borderWidth: 1,
     borderColor: ThemeColors.border,
   },
   modalTitle: {
     color: ThemeColors.text,
-    fontSize: scale(20),
+    fontSize: scale(16),
     fontWeight: "700",
     textAlign: "center",
-    marginBottom: scale(20),
+    marginBottom: scale(14),
   },
   modalInputContainer: {
-    marginBottom: scale(16),
+    marginBottom: scale(12),
   },
   inputLabel: {
     color: ThemeColors.textSecondary,
-    fontSize: scale(14),
+    fontSize: scale(12),
     fontWeight: "600",
-    marginBottom: scale(8),
+    marginBottom: scale(6),
   },
   modalInput: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: scale(12),
-    padding: scale(16),
+    borderRadius: scale(10),
+    padding: scale(12),
     color: ThemeColors.text,
-    fontSize: scale(16),
+    fontSize: scale(14),
     borderWidth: 1,
     borderColor: ThemeColors.border,
   },
@@ -2339,30 +2639,30 @@ const styles = StyleSheet.create({
   },
   colorPickerTitle: {
     color: ThemeColors.textSecondary,
-    fontSize: scale(14),
+    fontSize: scale(12),
     fontWeight: "600",
-    marginBottom: scale(12),
+    marginBottom: scale(10),
   },
   colorPickerButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: scale(12),
-    padding: scale(16),
+    borderRadius: scale(10),
+    padding: scale(12),
     borderWidth: 1,
     borderColor: ThemeColors.border,
     gap: scale(12),
   },
   selectedColorPreview: {
-    width: scale(24),
-    height: scale(24),
-    borderRadius: scale(12),
+    width: scale(20),
+    height: scale(20),
+    borderRadius: scale(10),
     borderWidth: 2,
     borderColor: "#fff",
   },
   colorPickerButtonText: {
     color: ThemeColors.text,
-    fontSize: scale(16),
+    fontSize: scale(14),
     flex: 1,
   },
   colorGrid: {
@@ -2372,9 +2672,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   colorOption: {
-    width: scale(44),
-    height: scale(44),
-    borderRadius: scale(22),
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     justifyContent: "center",
     alignItems: "center",
     elevation: 3,
@@ -2388,24 +2688,24 @@ const styles = StyleSheet.create({
   },
   iconPickerTitle: {
     color: ThemeColors.textSecondary,
-    fontSize: scale(14),
+    fontSize: scale(12),
     fontWeight: "600",
-    marginBottom: scale(12),
+    marginBottom: scale(10),
   },
   iconPickerButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: scale(12),
-    padding: scale(16),
+    borderRadius: scale(10),
+    padding: scale(12),
     borderWidth: 1,
     borderColor: ThemeColors.border,
     gap: scale(12),
   },
   selectedIconPreview: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     justifyContent: "center",
     alignItems: "center",
@@ -2414,7 +2714,7 @@ const styles = StyleSheet.create({
   },
   iconPickerButtonText: {
     color: ThemeColors.text,
-    fontSize: scale(16),
+    fontSize: scale(14),
     flex: 1,
   },
   iconGrid: {
@@ -2424,9 +2724,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   iconOption: {
-    width: scale(48),
-    height: scale(48),
-    borderRadius: scale(24),
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     justifyContent: "center",
     alignItems: "center",
@@ -2451,7 +2751,7 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: "row",
     gap: scale(12),
-    marginTop: scale(20),
+    marginTop: scale(14),
   },
   modalButton: {
     flex: 1,
@@ -2459,7 +2759,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   modalButtonGradient: {
-    paddingVertical: scale(16),
+    paddingVertical: scale(12),
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -2467,7 +2767,7 @@ const styles = StyleSheet.create({
   },
   modalButtonText: {
     color: "#fff",
-    fontSize: scale(16),
+    fontSize: scale(14),
     fontWeight: "600",
   },
   inputError: {
@@ -2475,14 +2775,14 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: ThemeColors.danger,
-    fontSize: scale(12),
+    fontSize: scale(11),
     marginTop: scale(4),
   },
   passwordDescription: {
     color: ThemeColors.textSecondary,
-    fontSize: scale(14),
+    fontSize: scale(12),
     textAlign: "center",
-    marginBottom: scale(20),
+    marginBottom: scale(14),
     lineHeight: scale(20),
   },
   disabledButton: {
@@ -2490,7 +2790,7 @@ const styles = StyleSheet.create({
   },
   loadingIndicator: {
     color: ThemeColors.primary,
-    fontSize: scale(12),
+    fontSize: scale(10),
   },
 });
 

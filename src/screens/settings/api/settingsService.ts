@@ -8,7 +8,7 @@ export interface SettingItem {
   name: string;
   icon: string;
   color: string;
-  category: "categories" | "skipReasons" | "priorities";
+  category: "categories" | "skipReasons" | "priorities" | "folders";
   priority?: number;
   level?: number;
   createdAt?: string;
@@ -32,6 +32,10 @@ export interface PriorityLevel extends SettingItem {
   level: number;
   priority: number;
   taskCount?: number;
+}
+
+export interface Folder extends SettingItem {
+  category: "folders";
 }
 
 export interface CreateSettingItemData {
@@ -180,12 +184,13 @@ export const ICON_OPTIONS = [
 // Helper function to convert API item to SettingItem
 const convertApiItemToSettingItem = (
   apiItem: ApiItemResponse,
-  category: "categories" | "skipReasons" | "priorities"
+  category: "categories" | "skipReasons" | "priorities" | "folders"
 ): SettingItem => {
   return {
     id: apiItem.id,
     name: apiItem.name,
-    icon: apiItem.icon,
+    // Default to a generic folder icon if API omits it for folders
+    icon: apiItem.icon || (category === "folders" ? "folder" : "list"),
     color: apiItem.color,
     category,
     priority: apiItem.priority,
@@ -193,6 +198,148 @@ const convertApiItemToSettingItem = (
     createdAt: apiItem.created_at,
     updatedAt: apiItem.updated_at,
   };
+};
+
+// Folders API functions
+export const getFolders = async (): Promise<ApiResponse<Folder[]>> => {
+  try {
+    // Note: OpenAPI GET endpoint path is misspelled as /settings/floder
+    const response = await apiRequest<{ categories: ApiItemResponse[] }>({
+      method: "GET",
+      url: "/settings/floder",
+    });
+
+    if (response.status && (response as any).data?.categories) {
+      const folders = (response.data as any).categories.map(
+        (item: ApiItemResponse) =>
+          convertApiItemToSettingItem(item, "folders") as Folder
+      );
+      return {
+        status: true,
+        data: folders,
+        message: response.message,
+      };
+    }
+
+    return {
+      status: false,
+      error: {
+        code: "FETCH_FOLDERS_FAILED",
+        message: response.error?.message || "Failed to fetch folders",
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching folders:", error);
+    return {
+      status: false,
+      error: {
+        code: "FETCH_FOLDERS_FAILED",
+        message: "Failed to fetch folders. Please try again.",
+      },
+    };
+  }
+};
+
+export const createFolder = async (
+  data: Pick<CreateSettingItemData, "name" | "color">
+): Promise<ApiResponse<Folder>> => {
+  try {
+    const response = await apiRequest<ApiItemDataResponse>({
+      method: "POST",
+      url: "/settings/folders",
+      data,
+    });
+
+    if (response.status && response.data) {
+      const folder = convertApiItemToSettingItem(
+        response.data.item,
+        "folders"
+      ) as Folder;
+      return {
+        status: true,
+        data: folder,
+        message: response.message,
+      };
+    }
+
+    return {
+      status: false,
+      error: {
+        code: "CREATE_FOLDER_FAILED",
+        message: response.error?.message || "Failed to create folder",
+      },
+    };
+  } catch (error) {
+    console.error("Error creating folder:", error);
+    return {
+      status: false,
+      error: {
+        code: "CREATE_FOLDER_FAILED",
+        message: "Failed to create folder. Please try again.",
+      },
+    };
+  }
+};
+
+export const updateFolder = async (
+  data: { id: string } & Partial<Pick<CreateSettingItemData, "name" | "color">>
+): Promise<ApiResponse<Folder>> => {
+  try {
+    const response = await apiRequest<ApiItemDataResponse>({
+      method: "PATCH",
+      url: "/settings/folder",
+      data,
+    });
+
+    if (response.status && response.data) {
+      const folder = convertApiItemToSettingItem(
+        response.data.item,
+        "folders"
+      ) as Folder;
+      return {
+        status: true,
+        data: folder,
+        message: response.message,
+      };
+    }
+
+    return {
+      status: false,
+      error: {
+        code: "UPDATE_FOLDER_FAILED",
+        message: response.error?.message || "Failed to update folder",
+      },
+    };
+  } catch (error) {
+    console.error("Error updating folder:", error);
+    return {
+      status: false,
+      error: {
+        code: "UPDATE_FOLDER_FAILED",
+        message: "Failed to update folder. Please try again.",
+      },
+    };
+  }
+};
+
+export const deleteFolder = async (id: string): Promise<ApiResponse> => {
+  try {
+    const response = await apiRequest({
+      method: "DELETE",
+      url: "/settings/folder",
+      data: { id },
+    });
+    return response;
+  } catch (error) {
+    console.error("Error deleting folder:", error);
+    return {
+      status: false,
+      error: {
+        code: "DELETE_FOLDER_FAILED",
+        message: "Failed to delete folder. Please try again.",
+      },
+    };
+  }
 };
 
 // Categories API functions
@@ -400,7 +547,13 @@ export const createSkipReason = async (
       };
     }
 
-    return response as ApiResponse<SkipReason>;
+    return {
+      status: false,
+      error: {
+        code: "CREATE_SKIP_REASON_FAILED",
+        message: response.error?.message || "Failed to create skip reason",
+      },
+    };
   } catch (error) {
     console.error("Error creating skip reason:", error);
     return {
@@ -435,7 +588,13 @@ export const updateSkipReason = async (
       };
     }
 
-    return response as ApiResponse<SkipReason>;
+    return {
+      status: false,
+      error: {
+        code: "UPDATE_SKIP_REASON_FAILED",
+        message: response.error?.message || "Failed to update skip reason",
+      },
+    };
   } catch (error) {
     console.error("Error updating skip reason:", error);
     return {
@@ -490,7 +649,13 @@ export const getPriorities = async (): Promise<
       };
     }
 
-    return response as ApiResponse<PriorityLevel[]>;
+    return {
+      status: false,
+      error: {
+        code: "FETCH_PRIORITIES_FAILED",
+        message: response.error?.message || "Failed to fetch priorities",
+      },
+    };
   } catch (error) {
     console.error("Error fetching priorities:", error);
     return {
@@ -525,7 +690,13 @@ export const createPriority = async (
       };
     }
 
-    return response as ApiResponse<PriorityLevel>;
+    return {
+      status: false,
+      error: {
+        code: "CREATE_PRIORITY_FAILED",
+        message: response.error?.message || "Failed to create priority",
+      },
+    };
   } catch (error) {
     console.error("Error creating priority:", error);
     return {
@@ -560,7 +731,13 @@ export const updatePriority = async (
       };
     }
 
-    return response as ApiResponse<PriorityLevel>;
+    return {
+      status: false,
+      error: {
+        code: "UPDATE_PRIORITY_FAILED",
+        message: response.error?.message || "Failed to update priority",
+      },
+    };
   } catch (error) {
     console.error("Error updating priority:", error);
     return {
@@ -713,6 +890,12 @@ export const settingsService = {
   createPriority,
   updatePriority,
   deletePriority,
+
+  // Folders
+  getFolders,
+  createFolder,
+  updateFolder,
+  deleteFolder,
 
   // User Info
   getUserInfo,

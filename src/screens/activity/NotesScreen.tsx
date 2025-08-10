@@ -16,6 +16,7 @@ import {
   StatusBar,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import Markdown from "react-native-markdown-display";
 import Icon from "react-native-vector-icons/Ionicons";
 import { Activity } from "../../types";
 import { ThemeColors } from "../../config/theme";
@@ -33,6 +34,7 @@ interface Note {
   tags?: string[];
   color?: string;
   pinned?: boolean;
+  pinnedAt?: string;
   folder?: string;
 }
 
@@ -56,17 +58,44 @@ const NoteColors = [
 
 type FolderMeta = { id: string; name: string; color: string };
 
-const FOLDER_REGISTRY: Record<string, string> = {
-  All: ThemeColors.textSecondary,
-  Fitness: "#4ECDC4",
-  Health: "#FF9500",
-  Development: "#9C6CDA",
-  Work: "#00E5FF",
-  Personal: "#FF2D92",
-  General: ThemeColors.primary,
-};
-
-const slugify = (name: string) => name.toLowerCase().replace(/\s+/g, "-");
+// Dummy folders for display
+const mockFolders: FolderMeta[] = [
+  {
+    id: "1",
+    name: "Test",
+    color: "#00E5FF",
+  },
+  {
+    id: "2",
+    name: "Fitness",
+    color: "#4ECDC4",
+  },
+  {
+    id: "3",
+    name: "Health",
+    color: "#FF9500",
+  },
+  {
+    id: "4",
+    name: "Development",
+    color: "#9C6CDA",
+  },
+  {
+    id: "5",
+    name: "Work",
+    color: "#00E5FF",
+  },
+  {
+    id: "6",
+    name: "Personal",
+    color: "#FF2D92",
+  },
+  {
+    id: "7",
+    name: "General",
+    color: ThemeColors.primary,
+  },
+];
 
 // Enhanced mock data with better content
 const mockNotes: Note[] = [
@@ -81,6 +110,7 @@ const mockNotes: Note[] = [
     tags: ["workout", "progress", "strength"],
     color: ThemeColors.success,
     pinned: true,
+    pinnedAt: "2025-01-15T08:45:00Z",
     folder: "Fitness",
   },
   {
@@ -159,6 +189,13 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
     color: ThemeColors.primary,
     folder: "General",
   });
+  const [contentSelection, setContentSelection] = useState<{
+    start: number;
+    end: number;
+  }>({
+    start: 0,
+    end: 0,
+  });
 
   // Animations
   const [modalTranslateY] = useState(new Animated.Value(height));
@@ -202,33 +239,23 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
       return matchesSearch && matchesFolder;
     })
     .sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
+      const aPinned = !!a.pinned;
+      const bPinned = !!b.pinned;
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      if (aPinned && bPinned) {
+        const aPinnedAt = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+        const bPinnedAt = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+        if (bPinnedAt !== aPinnedAt) {
+          return bPinnedAt - aPinnedAt;
+        }
+      }
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
   const folders: FolderMeta[] = useMemo(() => {
-    const base: FolderMeta[] = [
-      { id: "all", name: "All", color: FOLDER_REGISTRY["All"] },
-    ];
-    const dynamic = Array.from(
-      new Set(notes.map((n) => n.folder || "General").filter(Boolean))
-    ).map((name) => ({
-      id: slugify(name),
-      name,
-      color: FOLDER_REGISTRY[name] || ThemeColors.textSecondary,
-    }));
-    // Ensure "General" exists in the list if used
-    const names = new Set(dynamic.map((f) => f.name));
-    if (!names.has("General")) {
-      dynamic.push({
-        id: "general",
-        name: "General",
-        color: FOLDER_REGISTRY["General"],
-      });
-    }
-    return [...base, ...dynamic];
-  }, [notes]);
+    return [{ id: "all", name: "All", color: "#B0B0B0" }, ...mockFolders];
+  }, []);
 
   const folderCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -317,9 +344,7 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
           </View>
 
           <View style={styles.noteContentContainer}>
-            <Text style={styles.noteContent} numberOfLines={3}>
-              {item.content}
-            </Text>
+            <Markdown style={markdownCardStyles}>{item.content}</Markdown>
           </View>
 
           {/* Tags removed per request for cleaner cards */}
@@ -429,10 +454,16 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
   };
 
   const togglePin = (noteId: string) => {
-    setNotes(
-      notes.map((note) =>
-        note.id === noteId ? { ...note, pinned: !note.pinned } : note
-      )
+    setNotes((prevNotes) =>
+      prevNotes.map((note) => {
+        if (note.id !== noteId) return note;
+        const nextPinned = !note.pinned;
+        return {
+          ...note,
+          pinned: nextPinned,
+          pinnedAt: nextPinned ? new Date().toISOString() : undefined,
+        };
+      })
     );
   };
 
@@ -542,7 +573,94 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
                 />
               </View>
 
-              {/* Content Input */}
+              {/* Editor Toolbar */}
+              <View
+                style={[styles.inputSection, styles.editorToolbarContainer]}
+              >
+                <TouchableOpacity
+                  style={styles.editorToolbarButton}
+                  onPress={() => {
+                    const { start, end } = contentSelection;
+                    const content = newNote.content || "";
+                    const selected = content.substring(start, end);
+                    const before = content.substring(0, start);
+                    const after = content.substring(end);
+                    const wrapped = `**${selected || "bold"}**`;
+                    const newContent = before + wrapped + after;
+                    const newCursor =
+                      start + 2 + (selected ? selected.length : 4);
+                    setNewNote({
+                      ...newNote,
+                      content: newContent,
+                      isRichText: true,
+                    });
+                    setContentSelection({ start: newCursor, end: newCursor });
+                  }}
+                >
+                  <Text style={styles.editorToolbarButtonText}>B</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.editorToolbarButton}
+                  onPress={() => {
+                    const { start, end } = contentSelection;
+                    const content = newNote.content || "";
+                    const selected = content.substring(start, end);
+                    const before = content.substring(0, start);
+                    const after = content.substring(end);
+                    const wrapped = `_${selected || "italic"}_`;
+                    const newContent = before + wrapped + after;
+                    const newCursor =
+                      start + 1 + (selected ? selected.length : 6);
+                    setNewNote({
+                      ...newNote,
+                      content: newContent,
+                      isRichText: true,
+                    });
+                    setContentSelection({ start: newCursor, end: newCursor });
+                  }}
+                >
+                  <Text style={styles.editorToolbarButtonText}>I</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.editorToolbarButton}
+                  onPress={() => {
+                    const { start, end } = contentSelection;
+                    const content = newNote.content || "";
+                    const lineStart = content.lastIndexOf("\n", start - 1) + 1;
+                    const lineEndIdx = content.indexOf("\n", end);
+                    const lineEnd =
+                      lineEndIdx === -1 ? content.length : lineEndIdx;
+                    const before = content.substring(0, lineStart);
+                    const middle = content.substring(lineStart, lineEnd);
+                    const after = content.substring(lineEnd);
+                    const lines = middle.split("\n");
+                    const bulleted = lines
+                      .map((l) =>
+                        l.trim().length === 0
+                          ? l
+                          : l.startsWith("- ")
+                          ? l
+                          : `- ${l}`
+                      )
+                      .join("\n");
+                    const newContent = before + bulleted + after;
+                    const newCursorEnd = lineStart + bulleted.length;
+                    setNewNote({
+                      ...newNote,
+                      content: newContent,
+                      isRichText: true,
+                    });
+                    setContentSelection({
+                      start: newCursorEnd,
+                      end: newCursorEnd,
+                    });
+                  }}
+                >
+                  <Text style={styles.editorToolbarButtonText}>•</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Content Input + Preview */}
               <View style={styles.inputSection}>
                 <TextInput
                   style={styles.contentInput}
@@ -554,7 +672,13 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
                   placeholderTextColor={ThemeColors.textSecondary}
                   multiline
                   textAlignVertical="top"
+                  onSelectionChange={(e) =>
+                    setContentSelection(e.nativeEvent.selection)
+                  }
                 />
+                  {/* <View style={styles.previewCard}>
+                    <Markdown style={markdownStyles}>{newNote.content}</Markdown>
+                  </View> */}
               </View>
 
               {/* Color Picker */}
@@ -566,35 +690,63 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {folders
                     .filter((f) => f.name !== "All")
-                    .map((folder) => (
-                      <TouchableOpacity
-                        key={folder.id}
-                        style={[
-                          styles.folderOption,
-                          newNote.folder === folder.name &&
-                            styles.selectedFolder,
-                        ]}
-                        onPress={() =>
-                          setNewNote({ ...newNote, folder: folder.name })
-                        }
-                      >
-                        <View
-                          style={[
-                            styles.folderColorDot,
-                            { backgroundColor: folder.color },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.folderOptionText,
-                            newNote.folder === folder.name &&
-                              styles.selectedFolderText,
-                          ]}
+                    .map((folder) => {
+                      const isActive = newNote.folder === folder.name;
+                      const ring = folder.color;
+                      const textColor = isActive
+                        ? folder.color
+                        : ThemeColors.textSecondary;
+                      const count = folderCounts[folder.name] ?? 0;
+                      return (
+                        <TouchableOpacity
+                          key={folder.id}
+                          style={styles.folderChip}
+                          onPress={() =>
+                            setNewNote({ ...newNote, folder: folder.name })
+                          }
+                          activeOpacity={0.85}
                         >
-                          {folder.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                          <LinearGradient
+                            colors={[`${folder.color}26`, `${folder.color}14`]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={[
+                              styles.folderInner,
+                              {
+                                borderColor: isActive
+                                  ? ring
+                                  : ThemeColors.border,
+                                borderWidth: 1,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.folderChipText,
+                                { color: textColor },
+                              ]}
+                            >
+                              {folder.name}
+                            </Text>
+                            <View
+                              style={[
+                                styles.countPill,
+                                { backgroundColor: `${folder.color}26` },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.countPillText,
+                                  { color: folder.color },
+                                ]}
+                              >
+                                {count}
+                              </Text>
+                            </View>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      );
+                    })}
                 </ScrollView>
               </View>
             </ScrollView>
@@ -621,6 +773,19 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
             placeholder="Search notes..."
             placeholderTextColor={ThemeColors.textSecondary}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery("")}
+              style={styles.clearButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon
+                name="close-circle"
+                size={scale(18)}
+                color={ThemeColors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -684,7 +849,7 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
 
       {/* Header removed per request */}
 
-      {/* Notes List */}
+      {/* Notes List (single column, rectangular cards) */}
       <FlatList
         data={filteredNotes}
         renderItem={renderNoteCard}
@@ -694,8 +859,7 @@ const NotesScreen: React.FC<NotesScreenProps> = ({ activity }) => {
         ListHeaderComponent={renderListHeader}
         contentContainerStyle={styles.listContainer}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
+        numColumns={1}
       />
 
       {/* Enhanced Floating Action Button */}
@@ -752,7 +916,7 @@ const styles = StyleSheet.create({
     borderColor: ThemeColors.border,
   },
   searchContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
     paddingTop: 24,
     paddingBottom: 10,
   },
@@ -764,14 +928,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
     color: ThemeColors.text,
     fontSize: scale(16),
   },
+  clearButton: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
   folderFilter: {
-    paddingLeft: 20,
+    paddingLeft: 0,
     marginBottom: 10,
   },
   folderChip: {
@@ -818,29 +993,26 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   listContainer: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 12,
     paddingBottom: 100,
   },
   listHeader: {
     backgroundColor: ThemeColors.background,
-  },
-  columnWrapper: {
-    justifyContent: "space-between",
+    paddingHorizontal: 5,
   },
   separator: {
-    height: 12,
+    height: 16,
   },
   noteCardContainer: {
-    flex: 1,
-    marginHorizontal: 6,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   noteCard: {
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: ThemeColors.border,
-    height: 180, // Reduced height by 50% as requested
+    minHeight: 140,
   },
   noteHeader: {
     flexDirection: "row",
@@ -1012,12 +1184,41 @@ const styles = StyleSheet.create({
     borderBottomColor: ThemeColors.border,
   },
   contentInput: {
-    fontSize: scale(16),
+    fontSize: scale(14),
     color: ThemeColors.text,
     minHeight: 200,
     paddingVertical: 16,
     textAlignVertical: "top",
     lineHeight: 24,
+  },
+  previewCard: {
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+    backgroundColor: ThemeColors.surface,
+    padding: 12,
+  },
+  editorToolbarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  editorToolbarButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: ThemeColors.border,
+  },
+  editorToolbarButtonText: {
+    color: ThemeColors.text,
+    fontWeight: "800",
+    fontSize: scale(14),
   },
   colorPicker: {
     paddingHorizontal: 20,
@@ -1053,6 +1254,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: ThemeColors.border,
     minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   selectedFolder: {
     backgroundColor: ThemeColors.primary,
@@ -1070,3 +1274,63 @@ const styles = StyleSheet.create({
 });
 
 export default NotesScreen;
+// Markdown styles matching ThemeColors
+const markdownStyles = {
+  body: {
+    color: ThemeColors.text,
+    fontSize: scale(14),
+    lineHeight: 20,
+  },
+  text: {
+    color: ThemeColors.text,
+  },
+  strong: {
+    color: ThemeColors.text,
+    fontWeight: "800" as const,
+  },
+  em: {
+    color: ThemeColors.text,
+    fontStyle: "italic" as const,
+  },
+  bullet_list_icon: {
+    color: ThemeColors.textSecondary,
+  },
+  bullet_list_content: {
+    color: ThemeColors.text,
+  },
+  paragraph: {
+    color: ThemeColors.text,
+    marginTop: 0,
+    marginBottom: 8,
+  },
+  list_item: {
+    color: ThemeColors.text,
+    marginBottom: 4,
+  },
+  code_inline: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    color: ThemeColors.text,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+};
+
+// Card-specific markdown (truncated look)
+const markdownCardStyles = {
+  body: {
+    color: ThemeColors.text,
+    fontSize: scale(12),
+    lineHeight: 18,
+  },
+  paragraph: {
+    color: ThemeColors.text,
+    marginTop: 0,
+    marginBottom: 4,
+  },
+  text: { color: ThemeColors.text },
+  strong: { fontWeight: "800" as const, color: ThemeColors.text },
+  em: { fontStyle: "italic" as const, color: ThemeColors.text },
+  bullet_list_icon: { color: ThemeColors.textSecondary },
+  bullet_list_content: { color: ThemeColors.text },
+};
