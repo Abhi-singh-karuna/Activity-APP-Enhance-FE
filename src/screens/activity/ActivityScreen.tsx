@@ -72,6 +72,7 @@ interface EnhancedActivity extends Activity {
   lastCompletedDate?: string;
   priorityName?: string;
   priorityColor?: string;
+  status?: "running" | "paused" | "completed" | "future" | "past" | "active";
 }
 
 // Animation configuration
@@ -424,6 +425,19 @@ const ActivityScreen = () => {
       return currentDate >= startDate && currentDate <= endDate;
     },
     []
+  );
+
+  // Compute a normalized status label for an activity
+  const computeActivityStatus = useCallback(
+    (activity: EnhancedActivity): EnhancedActivity["status"] => {
+      if (activity.isCompleted) return "completed";
+      if (activity.isPaused) return "paused";
+      if (activity.isRunning) return "running";
+      if (isActivityInFuture(activity)) return "future";
+      if (isActivityInPast(activity)) return "past";
+      return "active";
+    },
+    [isActivityInFuture, isActivityInPast]
   );
 
   const canStartActivity = useCallback(
@@ -1071,6 +1085,8 @@ const ActivityScreen = () => {
           priority: newActivity.priority || Math.floor(Math.random() * 100) + 1,
         } as EnhancedActivity;
 
+        activity.status = computeActivityStatus(activity);
+
         setActivities((prev) => [...prev, activity]);
         setModalVisible(false);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1087,7 +1103,7 @@ const ActivityScreen = () => {
         setToastVisible(true);
       }
     },
-    [timeToSeconds]
+    [timeToSeconds, computeActivityStatus]
   );
 
   // Modal management
@@ -1221,6 +1237,7 @@ const ActivityScreen = () => {
       const isFuture = isActivityInFuture(item);
       const isPast = isActivityInPast(item);
       const isActive = isActivityActive(item);
+      const status = item.status || computeActivityStatus(item);
       const canStart = canStartActivity(item);
       const isLongPressed = longPressedId === item.id;
       const showDeleteUI = isLongPressed && deleteReady;
@@ -1321,6 +1338,43 @@ const ActivityScreen = () => {
                     </View>
 
                     <View style={styles.headerRight}>
+                      {/* Status Badge (clickable to filter) */}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          const target: typeof filterStatus =
+                            status === "active" ? "all" : (status as any);
+                          setFilterStatus((prev) =>
+                            prev === target ? "all" : target
+                          );
+                          // Keep other filters intact
+                        }}
+                        onLongPress={(e) => {
+                          e.stopPropagation();
+                          setFilterStatus("all");
+                        }}
+                        accessibilityLabel="Filter by this status"
+                      >
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            status === "running" && styles.statusRunning,
+                            status === "paused" && styles.statusPaused,
+                            status === "completed" && styles.statusCompleted,
+                            status === "future" && styles.statusFuture,
+                            status === "past" && styles.statusPast,
+                            status === "active" && styles.statusActive,
+                            filterStatus ===
+                              ((status === "active" ? "all" : status) as any) &&
+                              styles.statusBadgeActive,
+                          ]}
+                        >
+                          <Text style={styles.statusBadgeText}>
+                            {status?.toUpperCase()}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
                       <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={(e) => {
@@ -3020,6 +3074,52 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: scale(8),
+  },
+  statusBadgeContainer: {
+    justifyContent: "center",
+  },
+  statusBadge: {
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(3),
+    borderRadius: scale(10),
+    borderWidth: 1,
+  },
+  statusBadgeActive: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  statusBadgeText: {
+    fontSize: scale(8),
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  statusRunning: {
+    backgroundColor: "rgba(0,229,255,0.18)",
+    borderColor: "#00E5FF",
+  },
+  statusPaused: {
+    backgroundColor: "rgba(255,149,0,0.18)",
+    borderColor: "#FF9500",
+  },
+  statusCompleted: {
+    backgroundColor: "rgba(78,205,196,0.18)",
+    borderColor: "#4ECDC4",
+  },
+  statusFuture: {
+    backgroundColor: "rgba(176,176,176,0.18)",
+    borderColor: "#B0B0B0",
+  },
+  statusPast: {
+    backgroundColor: "rgba(255,71,87,0.18)",
+    borderColor: "#FF4757",
+  },
+  statusActive: {
+    backgroundColor: "rgba(156,108,218,0.18)",
+    borderColor: "#9C6CDA",
   },
 
   // Main Content Row: Timer/Status and Duration
