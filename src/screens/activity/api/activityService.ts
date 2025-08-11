@@ -116,15 +116,15 @@ export const getActivities = async (
       params.toString() ? `?${params.toString()}` : ""
     }`;
 
-    const response = await apiRequest({
+    const response = await apiRequest<{ activities: ActivityResponse[] }>({
       method: "GET",
       url,
     });
-    return response as ApiResponse<{ activities: ActivityResponse[] }>;
+    return response;
   } catch (error) {
     console.error("Error fetching activities:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "FETCH_ACTIVITIES_FAILED",
         message: "Failed to fetch activities. Please try again.",
@@ -137,15 +137,15 @@ export const getActivity = async (
   id: string
 ): Promise<ApiResponse<{ activity: ActivityResponse }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ activity: ActivityResponse }>({
       method: "GET",
       url: `/activities/${id}`,
     });
-    return response as ApiResponse<{ activity: ActivityResponse }>;
+    return response;
   } catch (error) {
     console.error("Error fetching activity:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "FETCH_ACTIVITY_FAILED",
         message: "Failed to fetch activity. Please try again.",
@@ -158,7 +158,7 @@ export const createActivity = async (
   data: CreateActivityData
 ): Promise<ApiResponse<{ activity: ActivityResponse }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ activity: ActivityResponse }>({
       method: "POST",
       url: "/activities",
       data,
@@ -167,7 +167,54 @@ export const createActivity = async (
   } catch (error) {
     console.error("Error creating activity:", error);
     return {
-      success: false,
+      status: false,
+      error: {
+        code: "CREATE_ACTIVITY_FAILED",
+        message: "Failed to create activity. Please try again.",
+      },
+    };
+  }
+};
+
+// New payload formats to support frequency-based creation as required by the mock API
+export type FrequencyTypeApi = "one_time" | "daily" | "weekly" | "monthly";
+
+export interface FrequencyPayloadApi {
+  type: FrequencyTypeApi;
+  type_id: 1 | 2 | 3 | 4;
+  start_date: string; // YYYY/MM/DD
+  end_date: string | null; // YYYY/MM/DD or null for one_time
+  duration: string; // HH:MM:SS
+  days_list?: number[]; // weekly only (1-7 where 1=Monday, 7=Sunday)
+  month_list?: number[]; // monthly months (1-12)
+  date_list?: number[]; // monthly dates (1-31)
+}
+
+export interface CreateActivityApiPayload {
+  title: string;
+  category_id: string;
+  frequency: FrequencyPayloadApi;
+  tag: {
+    category_id: string;
+    priority_id: string;
+  };
+  color: string;
+}
+
+export const createActivityWithFrequency = async (
+  payload: CreateActivityApiPayload
+): Promise<ApiResponse<{ activity: ActivityResponse }>> => {
+  try {
+    const response = await apiRequest<{ activity: ActivityResponse }>({
+      method: "POST",
+      url: "/activities",
+      data: payload,
+    });
+    return response;
+  } catch (error) {
+    console.error("Error creating activity (frequency payload):", error);
+    return {
+      status: false,
       error: {
         code: "CREATE_ACTIVITY_FAILED",
         message: "Failed to create activity. Please try again.",
@@ -181,7 +228,7 @@ export const updateActivity = async (
   data: UpdateActivityData
 ): Promise<ApiResponse<{ activity: ActivityResponse }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ activity: ActivityResponse }>({
       method: "PUT",
       url: `/activities/${id}`,
       data,
@@ -190,7 +237,7 @@ export const updateActivity = async (
   } catch (error) {
     console.error("Error updating activity:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "UPDATE_ACTIVITY_FAILED",
         message: "Failed to update activity. Please try again.",
@@ -201,7 +248,7 @@ export const updateActivity = async (
 
 export const deleteActivity = async (id: string): Promise<ApiResponse> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<unknown>({
       method: "DELETE",
       url: `/activities/${id}`,
     });
@@ -209,7 +256,7 @@ export const deleteActivity = async (id: string): Promise<ApiResponse> => {
   } catch (error) {
     console.error("Error deleting activity:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "DELETE_ACTIVITY_FAILED",
         message: "Failed to delete activity. Please try again.",
@@ -224,7 +271,7 @@ export const updateTimer = async (
   timerData: TimerUpdateData
 ): Promise<ApiResponse<{ activity: ActivityResponse }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ activity: ActivityResponse }>({
       method: "POST",
       url: `/activities/${id}/timer`,
       data: timerData,
@@ -233,7 +280,7 @@ export const updateTimer = async (
   } catch (error) {
     console.error("Error updating timer:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "UPDATE_TIMER_FAILED",
         message: "Failed to update timer. Please try again.",
@@ -246,7 +293,7 @@ export const completeActivity = async (
   id: string
 ): Promise<ApiResponse<{ activity: ActivityResponse }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ activity: ActivityResponse }>({
       method: "POST",
       url: `/activities/${id}/complete`,
       data: {},
@@ -255,7 +302,7 @@ export const completeActivity = async (
   } catch (error) {
     console.error("Error completing activity:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "COMPLETE_ACTIVITY_FAILED",
         message: "Failed to complete activity. Please try again.",
@@ -271,7 +318,7 @@ export const createSession = async (
   notes?: string
 ): Promise<ApiResponse<{ session: ActivitySession }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ session: ActivitySession }>({
       method: "POST",
       url: `/activities/${activityId}/sessions`,
       data: { duration, notes },
@@ -280,7 +327,7 @@ export const createSession = async (
   } catch (error) {
     console.error("Error creating session:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "CREATE_SESSION_FAILED",
         message: "Failed to create session. Please try again.",
@@ -293,7 +340,7 @@ export const getActivitySessions = async (
   activityId: string
 ): Promise<ApiResponse<{ sessions: ActivitySession[] }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ sessions: ActivitySession[] }>({
       method: "GET",
       url: `/activities/${activityId}/sessions`,
     });
@@ -301,7 +348,7 @@ export const getActivitySessions = async (
   } catch (error) {
     console.error("Error fetching sessions:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "FETCH_SESSIONS_FAILED",
         message: "Failed to fetch sessions. Please try again.",
@@ -315,7 +362,7 @@ export const getStatistics = async (): Promise<
   ApiResponse<{ statistics: ActivityStatistics }>
 > => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ statistics: ActivityStatistics }>({
       method: "GET",
       url: "/activities/statistics",
     });
@@ -323,7 +370,7 @@ export const getStatistics = async (): Promise<
   } catch (error) {
     console.error("Error fetching statistics:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "FETCH_STATISTICS_FAILED",
         message: "Failed to fetch statistics. Please try again.",
@@ -337,7 +384,7 @@ export const searchActivities = async (
   query: string
 ): Promise<ApiResponse<{ activities: ActivityResponse[] }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ activities: ActivityResponse[] }>({
       method: "GET",
       url: `/activities/search?query=${encodeURIComponent(query)}`,
     });
@@ -345,7 +392,7 @@ export const searchActivities = async (
   } catch (error) {
     console.error("Error searching activities:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "SEARCH_ACTIVITIES_FAILED",
         message: "Failed to search activities. Please try again.",
@@ -359,7 +406,7 @@ export const bulkUpdateActivities = async (
   updates: { id: string; data: UpdateActivityData }[]
 ): Promise<ApiResponse<{ activities: ActivityResponse[] }>> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<{ activities: ActivityResponse[] }>({
       method: "PUT",
       url: "/activities/bulk",
       data: { updates },
@@ -368,7 +415,7 @@ export const bulkUpdateActivities = async (
   } catch (error) {
     console.error("Error bulk updating activities:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "BULK_UPDATE_FAILED",
         message: "Failed to update activities. Please try again.",
@@ -379,7 +426,7 @@ export const bulkUpdateActivities = async (
 
 export const deleteAllActivities = async (): Promise<ApiResponse> => {
   try {
-    const response = await apiRequest({
+    const response = await apiRequest<unknown>({
       method: "DELETE",
       url: "/activities",
     });
@@ -387,7 +434,7 @@ export const deleteAllActivities = async (): Promise<ApiResponse> => {
   } catch (error) {
     console.error("Error deleting all activities:", error);
     return {
-      success: false,
+      status: false,
       error: {
         code: "DELETE_ALL_ACTIVITIES_FAILED",
         message: "Failed to delete all activities. Please try again.",

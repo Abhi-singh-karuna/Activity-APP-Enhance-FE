@@ -30,6 +30,11 @@ import {
   TagApiItem,
 } from "../tag/api/tagService";
 import {
+  createActivityWithFrequency,
+  type CreateActivityApiPayload,
+  type FrequencyTypeApi,
+} from "../screens/activity/api/activityService";
+import {
   format,
   startOfMonth,
   endOfMonth,
@@ -575,7 +580,74 @@ const AddActivityModal: React.FC<AddActivityModalProps> = ({
 
     try {
       setIsLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Build frequency payload per API spec
+      const typeMap: Record<
+        NonNullable<Frequency>,
+        { apiType: FrequencyTypeApi; typeId: 1 | 2 | 3 | 4 }
+      > = {
+        oneTime: { apiType: "one_time", typeId: 1 },
+        daily: { apiType: "daily", typeId: 2 },
+        weekly: { apiType: "weekly", typeId: 3 },
+        monthly: { apiType: "monthly", typeId: 4 },
+      };
+
+      const mapDayNameToApiNumber = (dayName: string): number => {
+        switch (dayName) {
+          case "Monday":
+            return 1;
+          case "Tuesday":
+            return 2;
+          case "Wednesday":
+            return 3;
+          case "Thursday":
+            return 4;
+          case "Friday":
+            return 5;
+          case "Saturday":
+            return 6;
+          case "Sunday":
+            return 7;
+          default:
+            return 1;
+        }
+      };
+
+      const start_date = newActivity.startDate as string;
+      const end_date =
+        frequency === "oneTime"
+          ? null
+          : (newActivity.endDate as string) || null;
+
+      const baseFrequency = {
+        type: typeMap[frequency as NonNullable<Frequency>].apiType,
+        type_id: typeMap[frequency as NonNullable<Frequency>].typeId,
+        start_date,
+        end_date,
+        duration: (newActivity.duration as string) || "01:00:00",
+      } as any;
+
+      if (frequency === "weekly") {
+        baseFrequency.days_list = selectedWeekdays.map(mapDayNameToApiNumber);
+      }
+      if (frequency === "monthly") {
+        baseFrequency.month_list = selectedMonths;
+        baseFrequency.date_list = selectedMonthDays;
+      }
+
+      const payload: CreateActivityApiPayload = {
+        title: (newActivity.title as string) || "",
+        category_id: selectedCategoryId as string,
+        frequency: baseFrequency,
+        tag: {
+          category_id: selectedCategoryId as string,
+          priority_id: selectedPriorityId as string,
+        },
+        color: (newActivity.color as string) || "#00E5FF",
+      };
+
+      const response = await createActivityWithFrequency(payload);
+
+      // If API call succeeds, keep existing UI flow
       if (mode === "edit" && onUpdate) {
         onUpdate(newActivity);
       } else if (onAdd) {

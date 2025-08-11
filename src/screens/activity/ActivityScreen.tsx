@@ -34,6 +34,7 @@ import { Activity, Category } from "../../types";
 import AddActivityModal from "../../components/AddActivityModal";
 import StyledText from "../../components/StyledText";
 import { useAppContext } from "../../context/AppContext";
+import Toast, { ToastType } from "../../components/Toast";
 
 // Get device dimensions
 const { width, height } = Dimensions.get("window");
@@ -169,6 +170,175 @@ const ActivityScreen = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [analyticsMode, setAnalyticsMode] = useState<"completion" | "time">(
     "completion"
+  );
+  // Toast state
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<ToastType>("info");
+  // Calendar dropdown state
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<
+    string | null
+  >(null);
+  const [twoWeekStartDate, setTwoWeekStartDate] = useState<Date>(() => {
+    const now = new Date();
+    // Align start to Monday for consistency
+    const day = now.getDay(); // 0=Sun..6=Sat
+    const daysSinceMonday = (day + 6) % 7;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - daysSinceMonday);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  });
+  const twoWeekScrollRef = useRef<ScrollView | null>(null);
+  const innerCalendarWidth = useMemo(
+    () => width - scale(20) * 2 - scale(16) * 2,
+    []
+  );
+  const twoWeekPaddingH = useMemo(() => scale(6), []);
+  const twoWeekGap = useMemo(() => scale(2), []);
+  const twoWeekCellWidth = useMemo(() => {
+    const VISIBLE_DAYS = 7; // show 7 days at a time
+    const available =
+      innerCalendarWidth -
+      twoWeekPaddingH * 2 -
+      twoWeekGap * (VISIBLE_DAYS - 1);
+    return Math.floor(available / VISIBLE_DAYS);
+  }, [innerCalendarWidth, twoWeekPaddingH, twoWeekGap]);
+
+  const centerTwoWeekPager = useCallback(() => {
+    requestAnimationFrame(() => {
+      twoWeekScrollRef.current?.scrollTo({
+        x: innerCalendarWidth,
+        animated: false,
+      });
+    });
+  }, [innerCalendarWidth]);
+  const alignWindowToDate = useCallback((date: Date) => {
+    const midStart = new Date(date);
+    midStart.setDate(date.getDate() - 3);
+    midStart.setHours(0, 0, 0, 0);
+    setTwoWeekStartDate(midStart);
+  }, []);
+
+  useEffect(() => {
+    if (showCalendar) {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}/${String(
+        now.getMonth() + 1
+      ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+      const refStr = selectedCalendarDate || todayStr;
+      const [yy, mm, dd] = refStr.split("/").map((p) => parseInt(p, 10));
+      if (!Number.isNaN(yy) && !Number.isNaN(mm) && !Number.isNaN(dd)) {
+        const sel = new Date(yy, mm - 1, dd);
+        alignWindowToDate(sel);
+      }
+      centerTwoWeekPager();
+    }
+  }, [
+    showCalendar,
+    centerTwoWeekPager,
+    selectedCalendarDate,
+    alignWindowToDate,
+  ]);
+
+  const handleTwoWeekMomentumEnd = useCallback(
+    (e: any) => {
+      const x = e?.nativeEvent?.contentOffset?.x || 0;
+      const pageIndex = Math.round(x / innerCalendarWidth);
+      const prevStart = new Date(twoWeekStartDate);
+      prevStart.setDate(prevStart.getDate() - 7);
+      const nextStart = new Date(twoWeekStartDate);
+      nextStart.setDate(nextStart.getDate() + 7);
+
+      if (pageIndex === 0) {
+        setTwoWeekStartDate(prevStart);
+      } else if (pageIndex === 2) {
+        setTwoWeekStartDate(nextStart);
+      }
+      centerTwoWeekPager();
+    },
+    [innerCalendarWidth, twoWeekStartDate, centerTwoWeekPager]
+  );
+
+  const renderTwoWeekPage = useCallback(
+    (start: Date) => {
+      const days: Date[] = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        d.setHours(0, 0, 0, 0);
+        days.push(d);
+      }
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}/${String(
+        now.getMonth() + 1
+      ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+      return (
+        <LinearGradient
+          colors={["rgba(0, 229, 255, 0.12)", "rgba(156, 108, 218, 0.08)"]}
+          style={[
+            styles.twoWeekGradient,
+            { paddingHorizontal: twoWeekPaddingH },
+          ]}
+        >
+          <View style={[styles.twoWeekRow, { width: innerCalendarWidth }]}>
+            {days.map((d, idx) => {
+              const cellDate = `${d.getFullYear()}/${String(
+                d.getMonth() + 1
+              ).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+              const isToday = cellDate === todayStr;
+              const isSelected = cellDate === selectedCalendarDate;
+              const weekday = ["S", "M", "T", "W", "T", "F", "S"][d.getDay()];
+              return (
+                <TouchableOpacity
+                  key={`tw-${idx}-${cellDate}`}
+                  style={[
+                    styles.twoWeekCell,
+                    {
+                      width: twoWeekCellWidth,
+                      height: Math.max(scale(44), twoWeekCellWidth),
+                      borderRadius: Math.round(twoWeekCellWidth / 3),
+                      marginRight: idx !== 13 ? twoWeekGap : 0,
+                    },
+                    isToday && styles.calendarCellToday,
+                    isSelected && styles.calendarCellSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedCalendarDate(cellDate);
+                    setFilterDateRange({ start: cellDate, end: cellDate });
+                    const [y2, m2, d2] = cellDate
+                      .split("/")
+                      .map((p) => parseInt(p, 10));
+                    if (
+                      !Number.isNaN(y2) &&
+                      !Number.isNaN(m2) &&
+                      !Number.isNaN(d2)
+                    ) {
+                      alignWindowToDate(new Date(y2, m2 - 1, d2));
+                      centerTwoWeekPager();
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.twoWeekDayLabel}>{weekday}</Text>
+                  <Text
+                    style={[
+                      styles.calendarCellText,
+                      isSelected && styles.calendarCellTextSelected,
+                    ]}
+                  >
+                    {d.getDate()}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </LinearGradient>
+      );
+    },
+    [selectedCalendarDate]
   );
   // Simple FAB: no menu
   const listRef = useRef<FlatList<EnhancedActivity> | null>(null);
@@ -904,9 +1074,17 @@ const ActivityScreen = () => {
         setActivities((prev) => [...prev, activity]);
         setModalVisible(false);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        // Success toast
+        setToastType("success");
+        setToastMessage("Activity created successfully");
+        setToastVisible(true);
       } catch (error) {
         console.error("Failed to add activity:", error);
         Alert.alert("Error", "Failed to add activity. Please try again.");
+        // Error toast
+        setToastType("error");
+        setToastMessage("Failed to create activity");
+        setToastVisible(true);
       }
     },
     [timeToSeconds]
@@ -1594,6 +1772,7 @@ const ActivityScreen = () => {
                       onPress={() => {
                         setShowSearchModal(true);
                         setShowFilters(false);
+                        setShowCalendar(false);
                       }}
                       activeOpacity={0.8}
                     >
@@ -1607,12 +1786,42 @@ const ActivityScreen = () => {
                         <Icon name="search" size={scale(16)} color="#00E5FF" />
                       </LinearGradient>
                     </TouchableOpacity>
+                    {/* Calendar Button */}
+                    <TouchableOpacity
+                      style={styles.floatingCalendarButton}
+                      onPress={() => {
+                        setShowCalendar((prev) => !prev);
+                        setShowFilters(false);
+                        setShowSearchModal(false);
+                      }}
+                      activeOpacity={0.8}
+                      accessibilityLabel="Open calendar"
+                    >
+                      <LinearGradient
+                        colors={[
+                          showCalendar
+                            ? "rgba(78, 205, 196, 0.3)"
+                            : "rgba(78, 205, 196, 0.2)",
+                          showCalendar
+                            ? "rgba(78, 205, 196, 0.2)"
+                            : "rgba(78, 205, 196, 0.1)",
+                        ]}
+                        style={styles.floatingCalendarGradient}
+                      >
+                        <Icon
+                          name="calendar-outline"
+                          size={scale(16)}
+                          color="#4ECDC4"
+                        />
+                      </LinearGradient>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.floatingFilterButton}
                       onPress={() => {
                         setShowFilters(!showFilters);
                         setShowSearchModal(false);
                         setSearchQuery("");
+                        setShowCalendar(false);
                       }}
                       activeOpacity={0.8}
                     >
@@ -1679,65 +1888,70 @@ const ActivityScreen = () => {
             )}
           </View>
 
-          {/* Action Buttons Row */}
-          <View style={styles.headerActionsRow}>
-            <TouchableOpacity
-              style={styles.headerActionButton}
-              onPress={() => navigation.navigate("Task")}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[
-                  "rgba(156, 108, 218, 0.2)",
-                  "rgba(156, 108, 218, 0.1)",
-                ]}
-                style={styles.headerButtonGradient}
+          {/* Action Buttons Row - hidden when filter or calendar is open */}
+          {!(showFilters || showCalendar) && (
+            <View style={styles.headerActionsRow}>
+              <TouchableOpacity
+                style={styles.headerActionButton}
+                onPress={() => navigation.navigate("Task")}
+                activeOpacity={0.8}
               >
-                <Icon
-                  name="checkbox-outline"
-                  size={scale(14)}
-                  color="#9C6CDA"
-                />
-                <Text style={styles.headerButtonText}>Tasks</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={[
+                    "rgba(156, 108, 218, 0.2)",
+                    "rgba(156, 108, 218, 0.1)",
+                  ]}
+                  style={styles.headerButtonGradient}
+                >
+                  <Icon
+                    name="checkbox-outline"
+                    size={scale(14)}
+                    color="#9C6CDA"
+                  />
+                  <Text style={styles.headerButtonText}>Tasks</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.headerActionButton}
-              onPress={() => navigation.navigate("Stats", {})}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={["rgba(78, 205, 196, 0.2)", "rgba(78, 205, 196, 0.1)"]}
-                style={styles.headerButtonGradient}
+              <TouchableOpacity
+                style={styles.headerActionButton}
+                onPress={() => navigation.navigate("Stats", {})}
+                activeOpacity={0.8}
               >
-                <Icon
-                  name="analytics-outline"
-                  size={scale(14)}
-                  color="#4ECDC4"
-                />
-                <Text style={styles.headerButtonText}>Analytics</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={[
+                    "rgba(78, 205, 196, 0.2)",
+                    "rgba(78, 205, 196, 0.1)",
+                  ]}
+                  style={styles.headerButtonGradient}
+                >
+                  <Icon
+                    name="analytics-outline"
+                    size={scale(14)}
+                    color="#4ECDC4"
+                  />
+                  <Text style={styles.headerButtonText}>Analytics</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.headerActionButton}
-              onPress={() => navigation.navigate("Settings")}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={["rgba(0, 229, 255, 0.2)", "rgba(0, 229, 255, 0.1)"]}
-                style={styles.headerButtonGradient}
+              <TouchableOpacity
+                style={styles.headerActionButton}
+                onPress={() => navigation.navigate("Settings")}
+                activeOpacity={0.8}
               >
-                <Icon
-                  name="settings-outline"
-                  size={scale(14)}
-                  color="#00E5FF"
-                />
-                <Text style={styles.headerButtonText}>Settings</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+                <LinearGradient
+                  colors={["rgba(0, 229, 255, 0.2)", "rgba(0, 229, 255, 0.1)"]}
+                  style={styles.headerButtonGradient}
+                >
+                  <Icon
+                    name="settings-outline"
+                    size={scale(14)}
+                    color="#00E5FF"
+                  />
+                  <Text style={styles.headerButtonText}>Settings</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
         </Animated.View>
 
         {/* Filter Dropdown */}
@@ -1929,186 +2143,380 @@ const ActivityScreen = () => {
           </Animated.View>
         )}
 
-        {/* Compact Analytics Section */}
-        <Animated.View
-          style={[
-            styles.compactAnalyticsContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: statsSlideAnim }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={["rgba(30, 30, 30, 0.8)", "rgba(44, 44, 46, 0.6)"]}
-            style={styles.compactAnalyticsCard}
+        {/* Calendar Dropdown */}
+        {showCalendar && (
+          <Animated.View
+            style={[
+              styles.calendarDropdownContainer,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  {
+                    translateY: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
           >
-            <View style={styles.compactStatsRow}>
-              {/* Total Activities */}
-              <TouchableOpacity
-                style={styles.compactStatItem}
-                activeOpacity={0.8}
-                onPress={clearAllFilters}
-                accessibilityLabel="Show all activities"
-              >
-                <View
-                  style={[
-                    styles.compactStatIcon,
-                    { backgroundColor: "rgba(176, 176, 176, 0.2)" },
-                  ]}
+            <LinearGradient
+              colors={["rgba(30, 30, 30, 0.95)", "rgba(44, 44, 46, 0.9)"]}
+              style={styles.calendarDropdownGradient}
+            >
+              {/* Two-week navigation */}
+              <View style={styles.calendarHeaderRow}>
+                <TouchableOpacity
+                  style={styles.calendarNavButton}
+                  onPress={() =>
+                    setTwoWeekStartDate((prev) => {
+                      const d = new Date(prev);
+                      d.setDate(d.getDate() - 14);
+                      return d;
+                    })
+                  }
+                  activeOpacity={0.8}
                 >
-                  <Icon name="grid-outline" size={scale(14)} color="#B0B0B0" />
-                </View>
-                <Text
-                  style={[
-                    styles.compactStatNumber,
-                    { color: noActiveFilters ? "#FFFFFF" : "#B0B0B0" },
-                  ]}
-                >
-                  {stats.total}
+                  <Icon name="chevron-back" size={scale(18)} color="#FFFFFF" />
+                </TouchableOpacity>
+                <Text style={styles.calendarMonthTitle}>
+                  {twoWeekStartDate.toLocaleString(undefined, {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  {"  ·  "}
+                  {new Date(
+                    twoWeekStartDate.getFullYear(),
+                    twoWeekStartDate.getMonth(),
+                    twoWeekStartDate.getDate() + 6
+                  ).toLocaleString(undefined, {
+                    month: "long",
+                    year: "numeric",
+                  })}
                 </Text>
-                <Text
-                  style={[
-                    styles.compactStatLabel,
-                    { color: noActiveFilters ? "#FFFFFF" : "#B0B0B0" },
-                  ]}
-                >
-                  Total
-                </Text>
-              </TouchableOpacity>
-
-              {/* Active */}
-              <TouchableOpacity
-                style={styles.compactStatItem}
-                activeOpacity={0.8}
-                onPress={() => setFilterStatus("running")}
-                accessibilityLabel="Filter running activities"
-              >
-                <View
-                  style={[
-                    styles.compactStatIcon,
-                    { backgroundColor: "rgba(0, 229, 255, 0.2)" },
-                  ]}
-                >
-                  <Icon name="play-circle" size={scale(14)} color="#00E5FF" />
-                </View>
-                <Text
-                  style={[
-                    styles.compactStatNumber,
-                    {
-                      color: filterStatus === "running" ? "#00E5FF" : "#B0B0B0",
-                    },
-                  ]}
-                >
-                  {stats.running}
-                </Text>
-                <Text
-                  style={[
-                    styles.compactStatLabel,
-                    {
-                      color: filterStatus === "running" ? "#00E5FF" : "#B0B0B0",
-                    },
-                  ]}
-                >
-                  Active
-                </Text>
-              </TouchableOpacity>
-
-              {/* Completed */}
-              <TouchableOpacity
-                style={styles.compactStatItem}
-                activeOpacity={0.8}
-                onPress={() => setFilterStatus("completed")}
-                accessibilityLabel="Filter completed activities"
-              >
-                <View
-                  style={[
-                    styles.compactStatIcon,
-                    { backgroundColor: "rgba(78, 205, 196, 0.2)" },
-                  ]}
+                <TouchableOpacity
+                  style={styles.calendarNavButton}
+                  onPress={() =>
+                    setTwoWeekStartDate((prev) => {
+                      const d = new Date(prev);
+                      d.setDate(d.getDate() + 7);
+                      return d;
+                    })
+                  }
+                  activeOpacity={0.8}
                 >
                   <Icon
-                    name="checkmark-circle"
-                    size={scale(14)}
-                    color="#4ECDC4"
+                    name="chevron-forward"
+                    size={scale(18)}
+                    color="#FFFFFF"
                   />
-                </View>
-                <Text
-                  style={[
-                    styles.compactStatNumber,
-                    {
-                      color:
-                        filterStatus === "completed" ? "#4ECDC4" : "#B0B0B0",
-                    },
-                  ]}
-                >
-                  {stats.completed}
-                </Text>
-                <Text
-                  style={[
-                    styles.compactStatLabel,
-                    {
-                      color:
-                        filterStatus === "completed" ? "#4ECDC4" : "#B0B0B0",
-                    },
-                  ]}
-                >
-                  Done
-                </Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
 
-              {/* Success Rate */}
-              <TouchableOpacity
-                style={styles.compactStatItem}
-                activeOpacity={0.8}
-                onPress={() => setSortBy("completion")}
-                onLongPress={() =>
-                  setAnalyticsMode((m) =>
-                    m === "completion" ? "time" : "completion"
-                  )
-                }
-                accessibilityLabel="Sort by completion or show time spent"
+              {/* 14-day pager with smooth slider */}
+              <View
+                style={{
+                  overflow: "hidden",
+                  width: innerCalendarWidth,
+                  alignSelf: "center",
+                }}
+                pointerEvents="box-none"
               >
-                <View
-                  style={[
-                    styles.compactStatIcon,
-                    { backgroundColor: "rgba(156, 108, 218, 0.2)" },
+                <ScrollView
+                  ref={twoWeekScrollRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onMomentumScrollEnd={handleTwoWeekMomentumEnd}
+                  bounces={false}
+                  alwaysBounceHorizontal={false}
+                  overScrollMode="never"
+                  directionalLockEnabled
+                  contentInsetAdjustmentBehavior="never"
+                  contentContainerStyle={[
+                    styles.twoWeekPagerContainer,
+                    { width: innerCalendarWidth * 3 },
                   ]}
+                  style={{ width: innerCalendarWidth }}
                 >
-                  <Icon name="trending-up" size={scale(14)} color="#9C6CDA" />
-                </View>
-                <Text
-                  style={[
-                    styles.compactStatNumber,
-                    {
-                      color:
-                        sortBy === "completion" || analyticsMode === "time"
-                          ? "#9C6CDA"
-                          : "#B0B0B0",
-                    },
-                  ]}
+                  <View
+                    style={{ width: innerCalendarWidth }}
+                    pointerEvents="box-none"
+                  >
+                    {renderTwoWeekPage(
+                      new Date(
+                        twoWeekStartDate.getFullYear(),
+                        twoWeekStartDate.getMonth(),
+                        twoWeekStartDate.getDate() - 7
+                      )
+                    )}
+                  </View>
+                  <View
+                    style={{ width: innerCalendarWidth }}
+                    pointerEvents="box-none"
+                  >
+                    {renderTwoWeekPage(twoWeekStartDate)}
+                  </View>
+                  <View
+                    style={{ width: innerCalendarWidth }}
+                    pointerEvents="box-none"
+                  >
+                    {renderTwoWeekPage(
+                      new Date(
+                        twoWeekStartDate.getFullYear(),
+                        twoWeekStartDate.getMonth(),
+                        twoWeekStartDate.getDate() + 7
+                      )
+                    )}
+                  </View>
+                </ScrollView>
+              </View>
+
+              {/* Calendar footer actions */}
+              <View style={styles.calendarFooterRow}>
+                <TouchableOpacity
+                  style={styles.calendarFooterButton}
+                  onPress={() => {
+                    setSelectedCalendarDate(null);
+                    setFilterDateRange({ start: null, end: null });
+                    // Re-center to today on clear
+                    const now = new Date();
+                    alignWindowToDate(now);
+                    centerTwoWeekPager();
+                  }}
+                  activeOpacity={0.8}
                 >
-                  {analyticsMode === "completion"
-                    ? `${stats.completionRate}%`
-                    : stats.timeSpent}
-                </Text>
-                <Text
-                  style={[
-                    styles.compactStatLabel,
-                    {
-                      color:
-                        sortBy === "completion" || analyticsMode === "time"
-                          ? "#9C6CDA"
-                          : "#B0B0B0",
-                    },
-                  ]}
+                  <Text style={styles.calendarFooterButtonText}>Clear</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.calendarFooterButtonPrimary}
+                  onPress={() => {
+                    const now = new Date();
+                    const day = now.getDay();
+                    const daysSinceMonday = (day + 6) % 7;
+                    const monday = new Date(now);
+                    monday.setDate(now.getDate() - daysSinceMonday);
+                    monday.setHours(0, 0, 0, 0);
+                    setTwoWeekStartDate(monday);
+
+                    const todayStr = getCurrentDate();
+                    setSelectedCalendarDate(todayStr);
+                    setFilterDateRange({ start: todayStr, end: todayStr });
+                  }}
+                  activeOpacity={0.8}
                 >
-                  {analyticsMode === "completion" ? "Success" : "Time"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-        </Animated.View>
+                  <LinearGradient
+                    colors={["#00E5FF", "#9C6CDA"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.calendarFooterButtonPrimaryGradient}
+                  >
+                    <Text style={styles.calendarFooterButtonPrimaryText}>
+                      Today
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.calendarFooterButton}
+                  onPress={() => setShowCalendar(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.calendarFooterButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        )}
+
+        {/* Compact Analytics Section - hidden when filter or calendar is open */}
+        {!(showFilters || showCalendar) && (
+          <Animated.View
+            style={[
+              styles.compactAnalyticsContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: statsSlideAnim }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={["rgba(30, 30, 30, 0.8)", "rgba(44, 44, 46, 0.6)"]}
+              style={styles.compactAnalyticsCard}
+            >
+              <View style={styles.compactStatsRow}>
+                {/* Total Activities */}
+                <TouchableOpacity
+                  style={styles.compactStatItem}
+                  activeOpacity={0.8}
+                  onPress={clearAllFilters}
+                  accessibilityLabel="Show all activities"
+                >
+                  <View
+                    style={[
+                      styles.compactStatIcon,
+                      { backgroundColor: "rgba(176, 176, 176, 0.2)" },
+                    ]}
+                  >
+                    <Icon
+                      name="grid-outline"
+                      size={scale(14)}
+                      color="#B0B0B0"
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.compactStatNumber,
+                      { color: noActiveFilters ? "#FFFFFF" : "#B0B0B0" },
+                    ]}
+                  >
+                    {stats.total}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.compactStatLabel,
+                      { color: noActiveFilters ? "#FFFFFF" : "#B0B0B0" },
+                    ]}
+                  >
+                    Total
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Active */}
+                <TouchableOpacity
+                  style={styles.compactStatItem}
+                  activeOpacity={0.8}
+                  onPress={() => setFilterStatus("running")}
+                  accessibilityLabel="Filter running activities"
+                >
+                  <View
+                    style={[
+                      styles.compactStatIcon,
+                      { backgroundColor: "rgba(0, 229, 255, 0.2)" },
+                    ]}
+                  >
+                    <Icon name="play-circle" size={scale(14)} color="#00E5FF" />
+                  </View>
+                  <Text
+                    style={[
+                      styles.compactStatNumber,
+                      {
+                        color:
+                          filterStatus === "running" ? "#00E5FF" : "#B0B0B0",
+                      },
+                    ]}
+                  >
+                    {stats.running}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.compactStatLabel,
+                      {
+                        color:
+                          filterStatus === "running" ? "#00E5FF" : "#B0B0B0",
+                      },
+                    ]}
+                  >
+                    Active
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Completed */}
+                <TouchableOpacity
+                  style={styles.compactStatItem}
+                  activeOpacity={0.8}
+                  onPress={() => setFilterStatus("completed")}
+                  accessibilityLabel="Filter completed activities"
+                >
+                  <View
+                    style={[
+                      styles.compactStatIcon,
+                      { backgroundColor: "rgba(78, 205, 196, 0.2)" },
+                    ]}
+                  >
+                    <Icon
+                      name="checkmark-circle"
+                      size={scale(14)}
+                      color="#4ECDC4"
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.compactStatNumber,
+                      {
+                        color:
+                          filterStatus === "completed" ? "#4ECDC4" : "#B0B0B0",
+                      },
+                    ]}
+                  >
+                    {stats.completed}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.compactStatLabel,
+                      {
+                        color:
+                          filterStatus === "completed" ? "#4ECDC4" : "#B0B0B0",
+                      },
+                    ]}
+                  >
+                    Done
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Success Rate */}
+                <TouchableOpacity
+                  style={styles.compactStatItem}
+                  activeOpacity={0.8}
+                  onPress={() => setSortBy("completion")}
+                  onLongPress={() =>
+                    setAnalyticsMode((m) =>
+                      m === "completion" ? "time" : "completion"
+                    )
+                  }
+                  accessibilityLabel="Sort by completion or show time spent"
+                >
+                  <View
+                    style={[
+                      styles.compactStatIcon,
+                      { backgroundColor: "rgba(156, 108, 218, 0.2)" },
+                    ]}
+                  >
+                    <Icon name="trending-up" size={scale(14)} color="#9C6CDA" />
+                  </View>
+                  <Text
+                    style={[
+                      styles.compactStatNumber,
+                      {
+                        color:
+                          sortBy === "completion" || analyticsMode === "time"
+                            ? "#9C6CDA"
+                            : "#B0B0B0",
+                      },
+                    ]}
+                  >
+                    {analyticsMode === "completion"
+                      ? `${stats.completionRate}%`
+                      : stats.timeSpent}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.compactStatLabel,
+                      {
+                        color:
+                          sortBy === "completion" || analyticsMode === "time"
+                            ? "#9C6CDA"
+                            : "#B0B0B0",
+                      },
+                    ]}
+                  >
+                    {analyticsMode === "completion" ? "Success" : "Time"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        )}
 
         {/* Activities List */}
         <FlatList
@@ -2318,6 +2726,14 @@ const ActivityScreen = () => {
             </Animated.View>
           </View>
         </Modal>
+
+        {/* Toast Notifications */}
+        <Toast
+          visible={toastVisible}
+          message={toastMessage}
+          type={toastType}
+          onHide={() => setToastVisible(false)}
+        />
       </View>
     </TouchableWithoutFeedback>
   );
@@ -2398,7 +2814,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
+  floatingCalendarButton: {
+    borderRadius: scale(12),
+    overflow: "hidden",
+    elevation: 3,
+    shadowColor: "#4ECDC4",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
   floatingFilterGradient: {
+    padding: scale(10),
+    borderRadius: scale(12),
+  },
+  floatingCalendarGradient: {
     padding: scale(10),
     borderRadius: scale(12),
   },
@@ -3060,6 +3489,155 @@ const styles = StyleSheet.create({
     padding: scale(20),
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  // Calendar Dropdown Styles
+  calendarDropdownContainer: {
+    marginHorizontal: scale(20),
+    marginBottom: scale(16),
+    borderRadius: scale(16),
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  calendarDropdownGradient: {
+    padding: scale(16),
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  calendarHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: scale(8),
+  },
+  calendarNavButton: {
+    padding: scale(6),
+    borderRadius: scale(8),
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  calendarMonthTitle: {
+    color: "#FFFFFF",
+    fontSize: scale(14),
+    fontWeight: "700",
+  },
+  calendarWeekRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: scale(6),
+    paddingHorizontal: scale(4),
+  },
+  calendarWeekLabel: {
+    width: (width - scale(20) * 2 - scale(16)) / 7,
+    textAlign: "center",
+    color: "#B0B0B0",
+    fontSize: scale(10),
+    fontWeight: "600",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: scale(2),
+    marginBottom: scale(8),
+  },
+  twoWeekGradient: {
+    borderRadius: scale(12),
+    padding: scale(6),
+    marginBottom: scale(8),
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  twoWeekRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    marginBottom: scale(8),
+  },
+  twoWeekPagerContainer: {
+    paddingVertical: scale(2),
+  },
+  calendarCell: {
+    width: (width - scale(20) * 2 - scale(16)) / 7,
+    height: (width - scale(20) * 2 - scale(16)) / 7,
+    borderRadius: (width - scale(20) * 2 - scale(16)) / 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  twoWeekCell: {
+    width: (width - scale(20) * 2 - scale(10)) / 14,
+    height: scale(44),
+    borderRadius: scale(10),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  twoWeekDayLabel: {
+    color: "#B0B0B0",
+    fontSize: scale(9),
+    marginBottom: scale(2),
+    fontWeight: "600",
+  },
+  calendarCellEmpty: {
+    width: (width - scale(20) * 2 - scale(16)) / 7,
+    height: (width - scale(20) * 2 - scale(16)) / 7,
+  },
+  calendarCellToday: {
+    borderColor: "#FFFFFF",
+    borderWidth: 2,
+    backgroundColor: "transparent",
+  },
+  calendarCellSelected: {
+    backgroundColor: "#2D5A27",
+    borderColor: "#4ECDC4",
+  },
+  calendarCellText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: scale(12),
+  },
+  calendarCellTextSelected: {
+    color: "#A8E6CF",
+  },
+  calendarFooterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: scale(6),
+  },
+  calendarFooterButton: {
+    paddingVertical: scale(8),
+    paddingHorizontal: scale(12),
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: scale(8),
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  calendarFooterButtonPrimary: {
+    borderRadius: scale(8),
+    overflow: "hidden",
+  },
+  calendarFooterButtonPrimaryGradient: {
+    paddingVertical: scale(8),
+    paddingHorizontal: scale(14),
+    borderRadius: scale(8),
+  },
+  calendarFooterButtonPrimaryText: {
+    color: "#000",
+    fontWeight: "800",
+    fontSize: scale(12),
+  },
+  calendarFooterButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: scale(12),
   },
   filterDropdownSection: {
     marginBottom: scale(16),
