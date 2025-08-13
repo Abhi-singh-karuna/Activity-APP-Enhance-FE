@@ -176,53 +176,6 @@ export const createActivity = async (
   }
 };
 
-// New payload formats to support frequency-based creation as required by the mock API
-export type FrequencyTypeApi = "one_time" | "daily" | "weekly" | "monthly";
-
-export interface FrequencyPayloadApi {
-  type: FrequencyTypeApi;
-  type_id: 1 | 2 | 3 | 4;
-  start_date: string; // YYYY/MM/DD
-  end_date: string | null; // YYYY/MM/DD or null for one_time
-  duration: string; // HH:MM:SS
-  days_list?: number[]; // weekly only (1-7 where 1=Monday, 7=Sunday)
-  month_list?: number[]; // monthly months (1-12)
-  date_list?: number[]; // monthly dates (1-31)
-}
-
-export interface CreateActivityApiPayload {
-  title: string;
-  category_id: string;
-  frequency: FrequencyPayloadApi;
-  tag: {
-    category_id: string;
-    priority_id: string;
-  };
-  color: string;
-}
-
-export const createActivityWithFrequency = async (
-  payload: CreateActivityApiPayload
-): Promise<ApiResponse<{ activity: ActivityResponse }>> => {
-  try {
-    const response = await apiRequest<{ activity: ActivityResponse }>({
-      method: "POST",
-      url: "/activities",
-      data: payload,
-    });
-    return response;
-  } catch (error) {
-    console.error("Error creating activity (frequency payload):", error);
-    return {
-      status: false,
-      error: {
-        code: "CREATE_ACTIVITY_FAILED",
-        message: "Failed to create activity. Please try again.",
-      },
-    };
-  }
-};
-
 export const updateActivity = async (
   id: string,
   data: UpdateActivityData

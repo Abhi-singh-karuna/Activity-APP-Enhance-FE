@@ -1,8 +1,3 @@
-// Load Reactotron configuration early
-if (__DEV__) {
-  import("./src/ReactotronConfig");
-}
-
 import { registerRootComponent } from "expo";
 
 import App from "./App";

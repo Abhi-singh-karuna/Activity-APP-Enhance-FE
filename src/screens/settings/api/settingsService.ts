@@ -347,7 +347,7 @@ export const getCategories = async (): Promise<
   ApiResponse<ActivityCategory[]>
 > => {
   try {
-    console.tron?.log("🌐 API Request: GET /settings/categories");
+    console.log("🌐 API Request: GET /settings/categories");
     const response = await apiRequest<ApiCategoriesResponse>({
       method: "GET",
       url: "/settings/categories",
@@ -388,7 +388,7 @@ export const createCategory = async (
   data: CreateSettingItemData
 ): Promise<ApiResponse<ActivityCategory>> => {
   try {
-    console.tron?.log("🌐 API Request: POST /settings/categories", data);
+    console.log("🌐 API Request: POST /settings/categories", data);
     const response = await apiRequest<ApiItemDataResponse>({
       method: "POST",
       url: "/settings/categories",

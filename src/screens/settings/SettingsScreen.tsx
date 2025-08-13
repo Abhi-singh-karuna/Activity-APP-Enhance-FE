@@ -354,32 +354,29 @@ const SettingsScreen = () => {
       // Update state with API responses
       if (categoriesRes.status && categoriesRes.data) {
         setCategories(categoriesRes.data);
-        console.tron?.log("✅ Categories loaded:", categoriesRes.data.length);
+        console.log("✅ Categories loaded:", categoriesRes.data.length);
       }
 
       if (skipReasonsRes.status && skipReasonsRes.data) {
         setSkipReasons(skipReasonsRes.data);
-        console.tron?.log(
-          "✅ Skip reasons loaded:",
-          skipReasonsRes.data.length
-        );
+        console.log("✅ Skip reasons loaded:", skipReasonsRes.data.length);
       }
 
       if (foldersRes.status && foldersRes.data) {
         setFolders(foldersRes.data);
-        console.tron?.log("✅ Folders loaded:", foldersRes.data.length);
+        console.log("✅ Folders loaded:", foldersRes.data.length);
       }
 
       if (prioritiesRes.status && prioritiesRes.data) {
         setPriorities(prioritiesRes.data);
-        console.tron?.log("✅ Priorities loaded:", prioritiesRes.data.length);
+        console.log("✅ Priorities loaded:", prioritiesRes.data.length);
       }
 
       // Add a small delay to make the refresh more noticeable
       await new Promise((resolve) => setTimeout(resolve, 300));
     } catch (error) {
       console.error("Failed to load settings:", error);
-      console.tron?.log("❌ Error loading settings:", error);
+      console.log("❌ Error loading settings:", error);
       showAlert({
         title: "Error",
         message: "Failed to load settings. Please try again.",
@@ -388,7 +385,7 @@ const SettingsScreen = () => {
       });
     } finally {
       setIsLoading(false);
-      console.tron?.log("🏁 Settings loading completed");
+      console.log("🏁 Settings loading completed");
     }
   }, [showAlert]);
 
