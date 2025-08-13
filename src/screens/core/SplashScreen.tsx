@@ -36,6 +36,7 @@ const scale = (size: number) => {
 
 // Create animated components
 const AnimatedStyledText = Animated.createAnimatedComponent(StyledText);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -44,87 +45,82 @@ const SplashScreen = () => {
   const [initError, setInitError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Simplified animation values
-  const clockScale = useRef(new Animated.Value(0)).current;
-  const clockRotation = useRef(new Animated.Value(0)).current;
-  const bookScale = useRef(new Animated.Value(0)).current;
-  const bookFlip = useRef(new Animated.Value(0)).current;
+  // Animation values for logo
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const ringRotation = useRef(new Animated.Value(0)).current;
+  const ringDash = useRef(new Animated.Value(0)).current;
+  const glowOpacity = useRef(new Animated.Value(0.4)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const subtitleOpacity = useRef(new Animated.Value(0)).current;
+  const letterLTranslate = useRef(new Animated.Value(-60)).current;
+  const letterTTranslate = useRef(new Animated.Value(60)).current;
   const penLineAnimation = useRef(new Animated.Value(0)).current;
-  const penPosition = useRef(new Animated.Value(-50)).current;
+  const penPosition = useRef(new Animated.Value(0)).current;
+  const bookSlide = useRef(new Animated.Value(0)).current;
+  const bookBounce = useRef(new Animated.Value(0)).current;
 
-  // Create interpolations
-  const clockSpin = clockRotation.interpolate({
+  // Interpolations
+  const ringSpin = ringRotation.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
-
-  const bookRotateY = bookFlip.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: ["0deg", "90deg", "0deg"],
+  const R = 80; // SVG ring radius
+  const C = 2 * Math.PI * R;
+  const ringDashOffset = ringDash.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, C],
   });
-
-  // Pen line drawing animation
   const penLineWidth = penLineAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, width * 0.8],
   });
-
-  // Pen position animation (moving horizontally like signing)
   const penX = penPosition.interpolate({
     inputRange: [0, 1],
     outputRange: [0, width * 0.8],
+  });
+  const bookX = bookSlide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, width * 0.6],
+  });
+  const bookY = bookBounce.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -8],
   });
 
   const startAnimations = () => {
     // Entrance sequence
     Animated.sequence([
-      // Dual icon entrance
+      Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
       Animated.parallel([
-        Animated.spring(clockScale, {
-          toValue: 1,
+        Animated.spring(letterLTranslate, {
+          toValue: 0,
           friction: 8,
           tension: 120,
           useNativeDriver: true,
         }),
-        Animated.spring(bookScale, {
-          toValue: 1,
+        Animated.spring(letterTTranslate, {
+          toValue: 0,
           friction: 8,
           tension: 120,
-          delay: 200,
           useNativeDriver: true,
         }),
       ]),
-
-      // Text animations
       Animated.parallel([
         Animated.timing(titleOpacity, {
           toValue: 1,
-          duration: 1000,
+          duration: 900,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(subtitleOpacity, {
           toValue: 1,
-          duration: 1200,
-          delay: 300,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
-
-      // Pen signing animation (horizontal line)
-      Animated.parallel([
-        Animated.timing(penLineAnimation, {
-          toValue: 1,
-          duration: 2500,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }),
-        Animated.timing(penPosition, {
-          toValue: 1,
-          duration: 2500,
+          duration: 1100,
+          delay: 150,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
@@ -132,25 +128,89 @@ const SplashScreen = () => {
     ]).start();
 
     // Continuous animations
-
-    // Clock rotation
     Animated.loop(
-      Animated.timing(clockRotation, {
+      Animated.timing(ringRotation, {
         toValue: 1,
-        duration: 6000,
+        duration: 5000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
     ).start();
 
-    // Book flip animation
     Animated.loop(
-      Animated.timing(bookFlip, {
+      Animated.timing(ringDash, {
         toValue: 1,
-        duration: 4000,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
+        duration: 2600,
+        easing: Easing.linear,
+        useNativeDriver: false,
       })
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowOpacity, {
+          toValue: 0.9,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowOpacity, {
+          toValue: 0.4,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+
+    // Pen line and moving book icon
+    Animated.parallel([
+      Animated.timing(penLineAnimation, {
+        toValue: 1,
+        duration: 2500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(penPosition, {
+        toValue: 1,
+        duration: 2500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bookSlide, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bookSlide, {
+          toValue: 0,
+          duration: 3000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bookBounce, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bookBounce, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
     ).start();
   };
 
@@ -214,44 +274,145 @@ const SplashScreen = () => {
       {/* Pure black background */}
       <View style={styles.background}>
         <View style={styles.content}>
-          {/* Dual logo section */}
+          {/* Logo section */}
           <View style={styles.logoSection}>
-            {/* Dual icons container */}
-            <View style={styles.iconsContainer}>
-              {/* Clock icon with rotation animation */}
-              <Animated.View
-                style={[
-                  styles.clockContainer,
-                  {
-                    transform: [{ scale: clockScale }, { rotate: clockSpin }],
-                  },
-                ]}
-              >
-                <LinearGradient
-                  colors={["#1A1A1A", "#2A2A2A"]}
-                  style={styles.iconBackground}
+            <Animated.View style={{ transform: [{ scale: logoScale }] }}>
+              {/* Build the logo using layered SVGs so we can animate ring and letters */}
+              <View style={styles.logoWrapper}>
+                {/* Base disc */}
+                <Svg
+                  width={scale(200)}
+                  height={scale(200)}
+                  viewBox="0 0 200 200"
                 >
-                  <Icon name="time-outline" size={scale(40)} color="#00E5FF" />
-                </LinearGradient>
-              </Animated.View>
+                  <Defs>
+                    <SvgLinearGradient
+                      id="monoBase"
+                      x1="0"
+                      y1="0"
+                      x2="1"
+                      y2="1"
+                    >
+                      <Stop offset="0%" stopColor="#EDEDED" />
+                      <Stop offset="100%" stopColor="#CFCFCF" />
+                    </SvgLinearGradient>
+                  </Defs>
+                  <Circle cx={100} cy={100} r={70} fill="#0F0F0F" />
+                  <Circle
+                    cx={100}
+                    cy={100}
+                    r={70}
+                    fill="#121212"
+                    opacity={0.3}
+                  />
+                  <AnimatedCircle
+                    cx={100}
+                    cy={100}
+                    r={68}
+                    fill="#1A1A1A"
+                    opacity={glowOpacity}
+                  />
+                </Svg>
 
-              {/* Book icon with flip animation */}
-              <Animated.View
-                style={[
-                  styles.bookContainer,
-                  {
-                    transform: [{ scale: bookScale }, { rotateY: bookRotateY }],
-                  },
-                ]}
-              >
-                <LinearGradient
-                  colors={["#1A1A1A", "#2A2A2A"]}
-                  style={styles.iconBackground}
+                {/* Rotating outer ring */}
+                <Animated.View
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    transform: [{ rotate: ringSpin }],
+                  }}
                 >
-                  <Icon name="book-outline" size={scale(40)} color="#9C6CDA" />
-                </LinearGradient>
-              </Animated.View>
-            </View>
+                  <Svg
+                    width={scale(200)}
+                    height={scale(200)}
+                    viewBox="0 0 200 200"
+                  >
+                    <Defs>
+                      <SvgLinearGradient id="ring2" x1="0" y1="0" x2="1" y2="1">
+                        <Stop offset="0%" stopColor="#00E5FF" />
+                        <Stop offset="50%" stopColor="#4ECDC4" />
+                        <Stop offset="100%" stopColor="#9C6CDA" />
+                      </SvgLinearGradient>
+                    </Defs>
+                    <AnimatedCircle
+                      cx={100}
+                      cy={100}
+                      r={R}
+                      stroke="url(#ring2)"
+                      strokeWidth={8}
+                      fill="none"
+                      strokeDasharray={C}
+                      strokeDashoffset={ringDashOffset as unknown as number}
+                    />
+                  </Svg>
+                </Animated.View>
+
+                {/* L entering from left */}
+                <Animated.View
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    transform: [{ translateX: letterLTranslate }],
+                  }}
+                >
+                  <Svg
+                    width={scale(200)}
+                    height={scale(200)}
+                    viewBox="0 0 200 200"
+                  >
+                    <Defs>
+                      <SvgLinearGradient
+                        id="ringLT"
+                        x1="0"
+                        y1="0"
+                        x2="1"
+                        y2="1"
+                      >
+                        <Stop offset="0%" stopColor="#00E5FF" />
+                        <Stop offset="50%" stopColor="#4ECDC4" />
+                        <Stop offset="100%" stopColor="#9C6CDA" />
+                      </SvgLinearGradient>
+                    </Defs>
+                    <Path d="M70 70h16v64h56v16H70V70z" fill="url(#ringLT)" />
+                  </Svg>
+                </Animated.View>
+
+                {/* T entering from right */}
+                <Animated.View
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    transform: [{ translateX: letterTTranslate }],
+                  }}
+                >
+                  <Svg
+                    width={scale(200)}
+                    height={scale(200)}
+                    viewBox="0 0 200 200"
+                  >
+                    <Defs>
+                      <SvgLinearGradient
+                        id="monoLT"
+                        x1="0"
+                        y1="0"
+                        x2="1"
+                        y2="1"
+                      >
+                        <Stop offset="0%" stopColor="#EDEDED" />
+                        <Stop offset="100%" stopColor="#CFCFCF" />
+                      </SvgLinearGradient>
+                    </Defs>
+                    <Path
+                      d="M56 70h96v16H112v64H96V86H56V70z"
+                      fill="url(#monoLT)"
+                    />
+                  </Svg>
+                </Animated.View>
+              </View>
+            </Animated.View>
           </View>
 
           {/* Title section */}
@@ -265,14 +426,14 @@ const SplashScreen = () => {
                   {
                     scale: titleOpacity.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0.8, 1],
+                      outputRange: [0.9, 1],
                     }),
                   },
                 ],
               },
             ]}
           >
-            Learning Tracker
+            Time Log
           </AnimatedStyledText>
 
           <AnimatedStyledText
@@ -292,19 +453,12 @@ const SplashScreen = () => {
               },
             ]}
           >
-            Master your time, enhance your knowledge
+            Track your time. Stay focused.
           </AnimatedStyledText>
 
           {/* Horizontal pen signing line */}
           <View style={styles.penSignatureContainer}>
-            <Animated.View
-              style={[
-                styles.penLine,
-                {
-                  width: penLineWidth,
-                },
-              ]}
-            >
+            <Animated.View style={[styles.penLine, { width: penLineWidth }]}>
               <LinearGradient
                 colors={["#00E5FF", "#4ECDC4", "#9C6CDA"]}
                 start={{ x: 0, y: 0 }}
@@ -317,15 +471,22 @@ const SplashScreen = () => {
             <Animated.View
               style={[
                 styles.penIcon,
-                {
-                  transform: [
-                    { translateX: penX },
-                    { rotate: "15deg" }, // Slight angle like writing
-                  ],
-                },
+                { transform: [{ translateX: penX }, { rotate: "15deg" }] },
               ]}
             >
               <Icon name="create-outline" size={scale(20)} color="#FFFFFF" />
+            </Animated.View>
+
+            {/* Animated moving book/notebook icon following the line */}
+            <Animated.View
+              style={{
+                position: "absolute",
+                left: 0,
+                bottom: scale(-18),
+                transform: [{ translateX: bookX }, { translateY: bookY }],
+              }}
+            >
+              <Icon name="book-outline" size={scale(22)} color="#9C6CDA" />
             </Animated.View>
           </View>
 
@@ -401,6 +562,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: scale(60),
     position: "relative",
+  },
+  logoWrapper: {
+    width: scale(200),
+    height: scale(200),
+    alignItems: "center",
+    justifyContent: "center",
   },
   iconsContainer: {
     flexDirection: "row",

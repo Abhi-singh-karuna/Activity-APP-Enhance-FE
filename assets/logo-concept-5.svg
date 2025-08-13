@@ -1,0 +1,28 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="60%" stop-color="#4ECDC4"/>
+      <stop offset="100%" stop-color="#9C6CDA"/>
+    </linearGradient>
+    <radialGradient id="bg5" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#191919"/>
+      <stop offset="100%" stop-color="#0A0A0A"/>
+    </radialGradient>
+  </defs>
+  <circle cx="512" cy="512" r="456" fill="url(#bg5)"/>
+  <!-- Stylized stopwatch -->
+  <circle cx="512" cy="540" r="260" stroke="url(#g5)" stroke-width="28" fill="none"/>
+  <rect x="468" y="220" width="88" height="80" rx="16" fill="#0F0F0F" stroke="url(#g5)" stroke-width="12"/>
+  <path d="M512 540l130-60" stroke="url(#g5)" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="512" cy="540" r="14" fill="#9C6CDA"/>
+  <!-- subtle ticks -->
+  <g stroke="#2A2A2A" stroke-width="8">
+    <path d="M512 296v40"/>
+    <path d="M512 744v40"/>
+    <path d="M296 540h40"/>
+    <path d="M744 540h40"/>
+  </g>
+</svg>
+
+
